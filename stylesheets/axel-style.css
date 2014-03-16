@@ -182,3 +182,32 @@ div.axel-tracker-menu  > button {
   color: black;
 }
 
+/************************/
+/* styles for the rich text editor */
+.bold {
+    font-weight: bold;
+}
+		
+.italics {
+    font-style:italic;
+}
+		
+.underline {
+    text-decoration:underline;
+}
+	
+.box {
+    padding:10px;
+    border-style:solid;
+    border-width:1px;
+    border-color:#D4D4D4;
+}
+			
+.button-as-links {
+    background:none!important;
+    border:none; 
+    padding:0!important; 
+}
+
+
+
