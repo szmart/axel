@@ -31,7 +31,7 @@
 
     var _timestamp = -1;
 	
-	/* The format name as displayed on the buttons and its corresponding CSS span.class*/
+	/* The format names as displayed on the buttons and their corresponding CSS span.class*/
 	var formatsAndCSS = [ 
 		{name : 'Bold', style : 'bold'},
 		{name : 'Italics', style : 'italics'},
@@ -76,16 +76,12 @@
 	  
     }
 	
-    function _test() {
-	    alert('ok')
-	}
-	
 	function cleanSelec(node) {
-	    if (node.firstChild && node.firstChild.firstChild) {
+	    /*if (node.firstChild && node.firstChild.firstChild) {
 		    return node.firstChild;
 		} else {
 		    return node;
-		}
+		}*/
 		
 		/*var tmp = [];
 		for (var i = 0; i < node.childNodes.length; i++) {
@@ -96,8 +92,10 @@
 		
 		for (var i = 0; i < tmp.length; i++) {
 			node.removeChild(tmp[i]);
-		}
+		}*/
 		
+		return node;
+		/*
 		if (node.childNodes.length === 1 && node.firstChild.firstChild && !node.firstChild.className) {
 		    var grandChild = node.firstChild.firstChild;
 		    node.removeChild(node.firstChild);
@@ -126,7 +124,7 @@
 	
 	function allChildrenTagged(node, tag) {
 		for (var i = 0; i < node.childNodes.length; i++) {
-			if (! hasClass(node.childNodes[i], tag)) {
+			if (! hasClass(node.childNodes[i], tag) && node.childNodes[i].innerHTML !== "") {
 				return false;
 			}
 		}
@@ -172,6 +170,19 @@
 		}
 		return true;
 	}
+	
+	function toggleButtons(instance) {
+	    try{
+	    if (instance.editInProgress) {
+		    instance.stopEditing();
+	    } else if (instance.getParam('noedit') !== 'true') {
+          xtdom.setAttribute(instance._handle, 'contenteditable', 'true');
+          xtdom.addClassName(instance._handle, 'axel-core-editable');
+          _timestamp = new Date().getTime();
+		  instance.startEditing();
+        }
+		} catch (e) {alert(e)}
+	}
 
     return {
 
@@ -201,7 +212,7 @@
 
       // Awakes the editor to DOM's events, registering the callbacks for them
       onAwake : function () {
-        var _this = this;
+        /*var _this = this;
         if (this.getParam('noedit') !== 'true') {
           xtdom.setAttribute(this._handle, 'contenteditable', 'true');
           xtdom.addClassName(this._handle, 'axel-core-editable');
@@ -217,7 +228,7 @@
           }
           // TODO: instant paste cleanup by tracking 'DOMNodeInserted' and merging each node inserted ?
         }
-        this.blurHandler = function (ev) { _this.handleBlur(ev); };
+        this.blurHandler = function (ev) { _this.handleBlur(ev); };*/
       },
 
       onLoad : function (aPoint, aDataSrc) {
@@ -311,7 +322,12 @@
 			var content = range.extractContents()
 			newNode.appendChild(content)
 			
+			//newNode.setAttribute('data-mark', 'range') 
+			
 			range.insertNode(newNode)
+			
+			//alert(this._handle.outerHTML)
+			alert(newNode.outerHTML);
 
 			var root = this._handle;
 			var tempRoot = xtdom.createElement(this.getDocument(), 'span');	
@@ -410,7 +426,16 @@
 			  
               xtdom.addEventListener(button, 'click', callToEnrich(style), false);  
 		  }
-		 
+		  
+		  var toggleButton = xtdom.createElement(this.getDocument(), 'span');
+		  toggleButton.setAttribute('style', 'color:blue; float:right;');
+		  toggleButton.innerHTML = 'Edit';
+		  this.toggleButton = toggleButton;
+		  
+		  xtdom.addEventListener(toggleButton, 'click', function () {toggleButtons(_this);}, false); 
+		  
+		  this._handle.parentNode.insertBefore(toggleButton, this._handle.nextSibling);
+	 
 		},
 		
 
@@ -430,7 +455,7 @@
 		  		  
 		  this.editInProgress = true;		  
 		  this.buttonBox.style.display='block';
-		  
+		  this.toggleButton.setAttribute('style', 'color:blue; float:right; padding-top:20px;'); 
 		  
           // avoid reentrant calls (e.g. user's click in the field while editing)
           //if (this.editInProgress === false) {
@@ -457,22 +482,23 @@
           if ((! this.stopInProgress) && (this.editInProgress !== false)) {
             this.stopInProgress = true;
 			this.buttonBox.style.display='none';
+			this.toggleButton.setAttribute('style', 'color:blue; float:right;');
             _timestamp = -1;
             this.keyboard.unregister(this, this.kbdHandlers);
             this.keyboard.release(this, this);
-            xtdom.removeEventListener(this._handle, 'blur', this.blurHandler, false);
-            _sanitize(this._handle, this.doc);
+            //xtdom.removeEventListener(this._handle, 'blur', this.blurHandler, false);
+            //_sanitize(this._handle, this.doc);
             if (!isCancel) {
               // user may have deleted all
               // FIXME: we should also normalize in case of a paste that created garbage (like some <br/>)
-              this.update(this._handle.firstChild ? this._handle.firstChild.data : null);
+              this.update(this._handle.firstChild.firstChild ? this._handle.firstChild.firstChild.data : null);
             } else {
               // restores previous data model - do not call _setData because its like if there was no input validated
-              if (this._handle.firstChild) {
-                this._handle.firstChild.data = this.model;
+              if (this._handle.firstChild && this._handle.firstChild.firstChild) {
+                this._handle.firstChild.firstChild.data = this.model;
               }
             }
-            this._handle.blur();
+            //this._handle.blur();
     //        xtdom.addClassName(this._handle, 'axel-core-editable');
             this.stopInProgress = false;
             this.editInProgress = false;
@@ -504,10 +530,9 @@
             this.unset(doPropagate);
           }
         },
-		
-		
 
         handleBlur : function (ev) {
+		    //alert(document.activeElement.contentDocument.activeElement)
 		    //_this.stopEditing(false);
 		  //this.buttonBox.focus();
 		  //alert('ok')
