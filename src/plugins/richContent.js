@@ -18,9 +18,7 @@
     var htag = aXTUse.getAttribute('handle') || 'span';
     var h = xtdom.createElement(aDocument, htag);
     var t = xtdom.createTextNode(aDocument, '');
-	var root = xtdom.createElement(aDocument, htag);
-    root.appendChild(t);
-	h.appendChild(root);
+    h.appendChild(t);
     xtdom.addClassName(h, 'axel-core-on');
     aContainer.appendChild(h);
     return h;
@@ -38,6 +36,13 @@
 	    {name : 'Underline', style : 'underline'},
 		{name : 'Strike', style : 'line-through'}
 	];
+	
+	var classToKind = { // Do we really need that translation ???
+	    'bold' : 'b',
+		'italics' : 'i',
+		'underline' : 'u',
+		'line-through': 'lt'
+	};
 
     function _focusAndSelect ( editor ) {
       // pre-condition: the editor's handle must already have focus
@@ -75,6 +80,71 @@
       }
 	  
     }
+
+	
+	function normalize(content, doc) {
+	    // TODO should normalize ill-formed data as much as possible
+		if (typeof content === typeof 'abc') {
+		    var span = xtdom.createElement(doc, 'span');
+			span.innerHTML = content;
+			return span;
+		}
+		
+		return content;
+	}
+	
+	function classToFragStyle(className) {
+	    return className.replace(/ /, '_');
+	}
+	
+	function logSpansToFragments(root, logger) {
+		for (var i = 0; i < root.childNodes.length; i++) {
+		    logger.openTag('Fragment');
+			if (root.childNodes[i].className) {
+			    logger.openAttribute('RichStyle');
+			    logger.write(classToFragStyle(root.childNodes[i].className));
+				logger.closeAttribute('RichStyle');
+			}
+			logger.write(root.childNodes[i].textContent);
+			logger.closeTag('Fragment');
+		}
+	}
+	
+	function fragStyleToClass(richStyle) {
+	    return richStyle.replace(/_/, ' ');
+	}
+	
+	function fragsToSpans(frags, doc) { // we should try to take into account ill-formed fragments...
+	    try {
+	    var root = xtdom.createElement(doc, 'span');
+	    //alert(frags.childNodes)
+		//var lowFrag = 'Fragment'.toLower().valueOf();
+		for (var i = 0; i < frags.childNodes.length; i++) {
+		    if (frags.childNodes[i].nodeType === Node.ELEMENT_NODE && frags.childNodes[i].tagName.toLowerCase() == 'fragment')  {
+			    var span = xtdom.createElement(doc, 'span');
+				if (frags.childNodes[i].getAttribute('RichStyle')) {
+				    var style = frags.childNodes[i].getAttribute('RichStyle');
+				    xtdom.addClassName(span, fragStyleToClass(style));
+				}
+				var text = xtdom.createTextNode(doc, frags.childNodes[i].textContent);
+				span.appendChild(text);
+		        //alert(frags.childNodes[i].tagName)
+				root.appendChild(span);
+		    } 
+		}
+		} catch (e) {alert(e)}
+		//alert(root.outerHTML);
+		return root;
+	}
+	
+	function interceptPaste(event) {
+		if (window.clipboardData) {
+			alert(JSON.stringify(window.clipboardData.getData("Text")));
+		} else {
+			alert(JSON.stringify(event.clipboardData.getData('text/html')));
+		}
+		return false;
+	}
 	
 	function cleanSelec(node) {
 	    /*if (node.firstChild && node.firstChild.firstChild) {
@@ -179,6 +249,7 @@
           xtdom.setAttribute(instance._handle, 'contenteditable', 'true');
           xtdom.addClassName(instance._handle, 'axel-core-editable');
           _timestamp = new Date().getTime();
+		  //xtdom.addEventListener(this._handle, 'blur', function (ev) {interceptPaste(ev);})
 		  instance.startEditing();
         }
 		} catch (e) {alert(e)}
@@ -191,17 +262,12 @@
       ////////////////////////
 
       onInit : function ( aDefaultData, anOptionAttr, aRepeater ) {
-        if (! aDefaultData) { 
-          this._content = '<span>click to edit</span>'; // should make a function to ensure proper structure of the content
+	    var data = normalize(aDefaultData, this.getDocument());
+        if (! data) { 
+          this._content = '<span>Click to edit</span>'; // should make a function to ensure proper structure of the content
         }
-		if (typeof aDefaultData === 'string') {
-		    var root = xtdom.createElement(this.getDocument(), 'span');
-			var t = xtdom.createTextNode(this.getDocument(), aDefaultData);
-			root.appendChild(t);
-		    this._content = root;
-		}
-        this.model = aDefaultData; // Quirck in case _setData is overloaded and checks getDefaultData()
-        this._setData(this.model);
+        this.model = data; // Quirck in case _setData is overloaded and checks getDefaultData()
+        this._setData(data);
         if (this.getParam('hasClass')) {
           xtdom.addClassName(this._handle, this.getParam('hasClass'));
         }
@@ -234,7 +300,7 @@
       onLoad : function (aPoint, aDataSrc) {
         var _value, _default;
         if (aPoint !== -1) { 
-          _value = aDataSrc.getDataFor(aPoint);
+          _value = fragsToSpans(aPoint[0], this.getDocument());//aDataSrc.getDataFor(aPoint);
           _default = this.getDefaultData();
           this._setData(_value || _default);
           this.setModified(_value !==  _default);
@@ -249,8 +315,10 @@
           aLogger.discardNodeIfEmpty();
           return;
         }
-        if (this.model) {
-          aLogger.write(this.model);
+        if (this._handle) {
+		  try {
+	      logSpansToFragments(this._handle, aLogger);
+		  } catch (e) {alert(e)}
         }
       },
 
@@ -270,6 +338,10 @@
 
         unfocus : function () {
           this.stopEditing(false);
+        },
+		
+		getDefaultData : function () {
+          return this._content;
         }
       },
 
@@ -281,16 +353,16 @@
 
         // Sets editor model value. Takes the handle and updates its DOM content.
         _setData : function (aData) {
-          var t;
-          if (this._handle.firstChild && this._handle.firstChild.firstChild) {
-            this._handle.firstChild.firstChild.data = aData;
-          } else { // in case user has deleted all the field
-		    var root = xtdom.createElement(this.getDocument(), 'span');
-            t = xtdom.createTextNode(this.getDocument(), aData);
-			root.appendChild(t);
-            this._handle.appendChild(root);
-          }
+
+          var content = normalize(aData, this.getDocument());
+		  
+		  if (this._handle.firstChild) {
+		      this._handle.replaceChild(content, this._handle.firstChild);
+		  } else {
+		      this._handle = content;
+		  }
           this.model = aData;
+		  
         },
 
         // AXEL keyboard API (called from Keyboard manager instance)
@@ -327,7 +399,7 @@
 			range.insertNode(newNode)
 			
 			//alert(this._handle.outerHTML)
-			alert(newNode.outerHTML);
+			//alert(newNode.outerHTML);
 
 			var root = this._handle;
 			var tempRoot = xtdom.createElement(this.getDocument(), 'span');	
@@ -414,7 +486,7 @@
 			  var inner = xtdom.createElement(this.getDocument(), 'span');
 			  var style = formatsAndCSS[i].style;
 			  inner.setAttribute('class', style);
-			  inner.innerHTML = formatsAndCSS[i].name;
+			  inner.textContent = formatsAndCSS[i].name;
 		      button.appendChild(inner);
 		      buttons.appendChild(button);	
 			  
@@ -494,8 +566,8 @@
               this.update(this._handle.firstChild.firstChild ? this._handle.firstChild.firstChild.data : null);
             } else {
               // restores previous data model - do not call _setData because its like if there was no input validated
-              if (this._handle.firstChild && this._handle.firstChild.firstChild) {
-                this._handle.firstChild.firstChild.data = this.model;
+              if (this._handle.firstChild) {
+                this._handle.firstChild = this.model;
               }
             }
             //this._handle.blur();
