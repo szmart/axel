@@ -8,7 +8,7 @@
  *
  * Web site : http://media.epfl.ch/Templates/
  * 
- * Author(s) : Stéphane Sire
+ * Author(s) : Stéphane Sire, Stéphane Martin
  * 
  * ***** END LICENSE BLOCK ***** */
 
@@ -26,6 +26,8 @@
 
   // Uses a closure to store class level private utility properties and functions
   var _Editor = (function () {
+  
+    xtdom.extractDefaultContentXT = extractDefaultContentXT;
 
     var _timestamp = -1;
 	
@@ -36,6 +38,16 @@
 	    {name : 'Underline', style : 'underline'},
 		{name : 'Strike', style : 'line-through'}
 	];
+	
+	function recognizedStyles() {
+	    var ret = []
+		for (fn in formatsAndCSS) {
+		    ret.push(fn.style);
+		}
+		return ret;
+	}
+	
+	var styles = recognizedStyles();
 	
 	var classToKind = { // Do we really need that translation ???
 	    'bold' : 'b',
@@ -80,6 +92,56 @@
       }
 	  
     }
+	
+	/*
+	  Extracts the content of an XTiger node. We need a function different from the default
+	  xtdom.extractDefaultContentXT() because the latter only extracts text content (by 
+	  concatenating the inner HTML of possible subnodes). Any formatting information is lost in 
+	  the process. Our method keeps the CSS formatting of span subnodes mentionned in formatsAndCSS.
+	*/
+	function extractDefaultContentXT(node) {
+	  if (xtiger.ATTRIBUTE == xtdom.getNodeTypeXT(node)) {
+		var dump = node.getAttribute('default');
+		if (dump && (-1 === dump.search(/\S/)))  {
+		    return null;
+		}
+	  }
+	  
+	  function innerText(node) {
+	      if (node.nodeType == xtdom.TEXT_NODE) {
+		     return node.textContent;
+		  } else if (node.childNodes) {
+		      var ret = "";
+		      for (var i = 0; i < node.childNodes.length; i++) {
+			    ret += innerText(node.childNodes[i]);
+			  }
+			  return ret;
+		  } else {
+		      return ""
+		  }
+	  }
+	  
+	  //alert('here ' + node.outerHTML)
+	  
+	  if (node.childNodes) {
+	    var root = document.createElement('span');
+		var cur;
+		while (node.firstChild) {
+		    cur = node.firstChild;
+			if (cur.nodeType === xtdom.ELEMENT_NODE && (cur.tagName === 'span' || cur.tagName === 'a')) {
+			    root.appendChild(cur);
+			} else {
+			    var span = document.createElement('span');
+				span.innerHTML = innerText(node.firstChild);
+				node.removeChild(node.firstChild);
+				root.appendChild(span);
+			}
+		}
+	  }
+	  
+	  //alert('root ' + root.outerHTML);
+	  return root;
+	}
 
 	
 	function normalize(content, doc) {
@@ -94,7 +156,7 @@
 	}
 	
 	function classToFragStyle(className) {
-	    return className.replace(/ /, '_');
+	    return className.replace(/\s+/g, '_');
 	}
 	
 	function logSpansToFragments(root, logger) {
@@ -105,13 +167,18 @@
 			    logger.write(classToFragStyle(root.childNodes[i].className));
 				logger.closeAttribute('RichStyle');
 			}
+			if (root.childNodes[i].tagName === 'a' && root.childNodes[i].href) {
+			    logger.openAttribute('Href');
+			    logger.write(root.childNodes[i].href);
+				logger.closeAttribute('Href');			    
+			}
 			logger.write(root.childNodes[i].textContent);
 			logger.closeTag('Fragment');
 		}
 	}
 	
 	function fragStyleToClass(richStyle) {
-	    return richStyle.replace(/_/, ' ');
+	    return richStyle.replace(/_/g, ' ');
 	}
 	
 	function fragsToSpans(frags, doc) { // we should try to take into account ill-formed fragments...
@@ -139,39 +206,11 @@
 	
 	function interceptPaste(event) {
 		if (window.clipboardData) {
-			alert(JSON.stringify(window.clipboardData.getData("Text")));
+			alert('1: ' + JSON.stringify(window.clipboardData.getData("Text")));
 		} else {
-			alert(JSON.stringify(event.clipboardData.getData('text/html')));
+			alert('2: ' + JSON.stringify(event.clipboardData.getData('text/html')));
 		}
 		return false;
-	}
-	
-	function cleanSelec(node) {
-	    /*if (node.firstChild && node.firstChild.firstChild) {
-		    return node.firstChild;
-		} else {
-		    return node;
-		}*/
-		
-		/*var tmp = [];
-		for (var i = 0; i < node.childNodes.length; i++) {
-			if (node.childNodes[i].innerHTML === "") {
-				tmp.push(node.childNodes[i]);
-			}
-		}
-		
-		for (var i = 0; i < tmp.length; i++) {
-			node.removeChild(tmp[i]);
-		}*/
-		
-		return node;
-		/*
-		if (node.childNodes.length === 1 && node.firstChild.firstChild && !node.firstChild.className) {
-		    var grandChild = node.firstChild.firstChild;
-		    node.removeChild(node.firstChild);
-			node.appendChild(grandChild);
-		}*/
-
 	}
 	
 	function inheritClass(node, tag) {
@@ -233,26 +272,44 @@
 			return false;
 		}
 		
-		for (var c in pri) {
-			if (! (c in sec)){
-				return false;
-			}
+		pri.sort();
+		sec.sort();
+		
+		for (var i = 0; i < pri.length; i++) {
+		   if (pri[i] !== sec[i]) {
+		       return false;
+		   }
 		}
 		return true;
+	}
+	
+	function equalTags(primus, secundus) {
+	    return primus.tagName === secundus.tagName;
+	}
+	
+	function inLink(node) {
+	    if (node.href) {
+		    return node.href;
+		} else if (node.parentNode){
+			return inLink(node.parentNode);
+		} else {
+		    return null;
+		}
 	}
 	
 	function toggleButtons(instance) {
 	    try{
 	    if (instance.editInProgress) {
 		    instance.stopEditing();
+			xtdom.setAttribute(instance._handle, 'contenteditable', 'false');
 	    } else if (instance.getParam('noedit') !== 'true') {
           xtdom.setAttribute(instance._handle, 'contenteditable', 'true');
-          xtdom.addClassName(instance._handle, 'axel-core-editable');
+          //xtdom.addClassName(instance._handle, 'axel-core-editable');
           _timestamp = new Date().getTime();
-		  //xtdom.addEventListener(this._handle, 'blur', function (ev) {interceptPaste(ev);})
+		  instance._handle.addEventListener('paste', function (ev) {interceptPaste(ev); return false;})
 		  instance.startEditing();
         }
-		} catch (e) {alert(e)}
+		} catch (e) {alert('toggle ' + e)}
 	}
 
     return {
@@ -262,18 +319,27 @@
       ////////////////////////
 
       onInit : function ( aDefaultData, anOptionAttr, aRepeater ) {
+	    try {
 	    var data = normalize(aDefaultData, this.getDocument());
         if (! data) { 
           this._content = '<span>Click to edit</span>'; // should make a function to ensure proper structure of the content
         }
-        this.model = data; // Quirck in case _setData is overloaded and checks getDefaultData()
         this._setData(data);
+		/*while (this._handle.firstChild) {
+		    this._handle.removeChild(this._handle.firstChild);
+		}
+		while (data.firstChild) {
+		    this._handle.appendChild(data.firstChild);
+		}
+        this.model = data*/
+        //alert(this._handle.outerHTML)		
         if (this.getParam('hasClass')) {
           xtdom.addClassName(this._handle, this.getParam('hasClass'));
         }
         this.keyboard = xtiger.session(this.getDocument()).load('keyboard');
         this.editInProgress = false;
 		this.createButtons();
+		} catch (e) {alert(e)}
       },
 
       // Awakes the editor to DOM's events, registering the callbacks for them
@@ -302,12 +368,16 @@
         if (aPoint !== -1) { 
           _value = fragsToSpans(aPoint[0], this.getDocument());//aDataSrc.getDataFor(aPoint);
           _default = this.getDefaultData();
-          this._setData(_value || _default);
+          defval = _value || _default;
+		  //alert(this._handle.outerHTML)
+          this._setData(defval);
+		  //alert(this._handle.outerHTML)
           this.setModified(_value !==  _default);
           this.set(false);
         } else {
           this.clear(false);
         }
+		//alert(this._handle.outerHTML)
       },
 
       onSave : function (aLogger) {
@@ -353,15 +423,18 @@
 
         // Sets editor model value. Takes the handle and updates its DOM content.
         _setData : function (aData) {
+		  try {		
+		  //alert(aData.outerHTML)
 
-          var content = normalize(aData, this.getDocument());
-		  
-		  if (this._handle.firstChild) {
-		      this._handle.replaceChild(content, this._handle.firstChild);
-		  } else {
-		      this._handle = content;
+		  while (this._handle.firstChild) {
+		      this._handle.removeChild(this._handle.firstChild);
 		  }
+		  while (aData.firstChild) {
+		      this._handle.appendChild(aData.firstChild);
+		  }
+		  
           this.model = aData;
+		  } catch (e) {alert(e)}
 		  
         },
 
@@ -383,6 +456,99 @@
         doKeyUp : function (ev) { 
         },
 		
+		makeLink : function (urlNode, link) {
+		    var url = urlNode.value;
+			if (url.indexOf('http://') != 0 && url.indexOf('https://') != 0) {
+			    url = 'http://' + url;
+			}
+			
+			// we should check urls are valid
+			
+			if (link) {
+			    var mainTag = 'a';
+			} else {
+			    var mainTag = 'span';
+			}
+            var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
+			var newNode = xtdom.createElement(this.getDocument(), mainTag);
+			if (mainTag === 'a') {
+			    newNode.setAttribute('href', url);	
+			}
+			var content = range.extractContents()
+			newNode.appendChild(content)
+			newNode.setAttribute('data-mark', 'new-l'); // test only
+			range.insertNode(newNode)
+			
+			var root = this._handle;
+			
+			//alert(root.outerHTML)
+			
+			var tempRoot = xtdom.createElement(this.getDocument(), 'span');
+            //tempRoot.setAttribute('href', url);
+			try {			
+
+			while (root.firstChild) {
+			    if (root.firstChild.firstChild) {
+				    while (root.firstChild.firstChild) {
+					    if (root.firstChild.firstChild.nodeType === xtdom.TEXT_NODE) {		
+                            var tag = root.firstChild.tagName;						
+						    var newFrag = xtdom.createElement(this.getDocument(), tag); // xtdom...
+							if (tag === 'a') {
+							    newFrag.setAttribute('href', url);	
+							}
+							addClass(newFrag, root.firstChild.className);
+							addClass(newFrag, root.firstChild.firstChild.className);
+							newFrag.appendChild(root.firstChild.firstChild);
+							tempRoot.appendChild(newFrag);
+						} else {
+						    if (root.firstChild.firstChild.tagName !== mainTag) {
+							    var cur = xtdom.createElement(this.getDocument(), mainTag);
+								cur.innerHTML = root.firstChild.firstChild.innerHTML;
+								if (root.firstChild.href) {
+								    cur.setAttribute('href', root.firstChild.href);
+								}
+								addClass(cur, root.firstChild.className);
+								addClass(cur, root.firstChild.firstChild.className);
+								root.firstChild.removeChild(root.firstChild.firstChild);
+							} else {
+							    var cur = root.firstChild.firstChild;
+								addClass(cur, root.firstChild.className);
+								addClass(cur, root.firstChild.firstChild.className);
+							}
+						    tempRoot.appendChild(cur);
+						}
+					}
+				} else {
+				    tempRoot.appendChild(root.firstChild);
+				} 
+			}
+			
+			} catch (e) {alert(e)}
+			//alert(tempRoot.outerHTML)
+			
+			var prev = tempRoot.firstChild;
+			root.appendChild(prev);
+			
+			while (tempRoot.firstChild) {
+				if (prev.className === "") {
+				    prev.removeAttribute("class");
+				}
+			    if (equalClasses(prev, tempRoot.firstChild) && equalTags(prev, tempRoot.firstChild)) {
+				    //alert(prev.outerHTML + "--" + tempRoot.firstChild.outerHTML)
+				    prev.innerHTML = prev.innerHTML + tempRoot.firstChild.innerHTML;
+					tempRoot.removeChild(tempRoot.firstChild);
+				} else if (tempRoot.firstChild.innerHTML === "") {
+				    tempRoot.removeChild(tempRoot.firstChild);
+				} else {
+				    prev = tempRoot.firstChild;
+				    root.appendChild(prev);
+				}
+			}
+				
+            //alert(this._handle.outerHTML)
+
+		},
+		
 		enrich : function (style) {
 		
 		    //alert(style)
@@ -394,7 +560,7 @@
 			var content = range.extractContents()
 			newNode.appendChild(content)
 			
-			//newNode.setAttribute('data-mark', 'range') 
+			newNode.setAttribute('data-mark', 'new') 
 			
 			range.insertNode(newNode)
 			
@@ -402,7 +568,6 @@
 			//alert(newNode.outerHTML);
 
 			var root = this._handle;
-			var tempRoot = xtdom.createElement(this.getDocument(), 'span');	
 
 			if (inheritClass(newNode, style)) {
 			    var inherit = true;
@@ -414,30 +579,48 @@
 			    var allTagged = true;
 			} else {
 			    var allTagged = false;
-			}			
+			}					
+			
+			var tempRoot = xtdom.createElement(this.getDocument(), 'span');	
+
+			//alert(this._handle.outerHTML)
 			
 			while (root.firstChild) {
-			    if (root.firstChild.childNodes.length > 1) {
+			    if (root.firstChild.firstChild) {
 				    while (root.firstChild.firstChild) {
-					    if (root.firstChild.firstChild.nodeType == 3) { // we have a text node
-						    var newFrag = document.createElement('span');
+					    if (root.firstChild.firstChild.nodeType === xtdom.TEXT_NODE) {
+						    var href = inLink(root.firstChild);
+						    var tag = href ? 'a' : 'span'; // necesssary ?				
+						    var newFrag = xtdom.createElement(this.getDocument(), tag); // xtdom...
+							if (href) {
+							    newFrag.setAttribute('href', href);
+							}
+							addClass(newFrag, root.firstChild.className);
 							newFrag.appendChild(root.firstChild.firstChild);
-                            addClass(newFrag, root.firstChild.className);
 							tempRoot.appendChild(newFrag);
-							if (inherit) {
-							    addClass(newFrag, style);
-							} 
 						} else {
-						    var c = root.firstChild.firstChild;
-						    tempRoot.appendChild(c);
-							addClass(c, root.firstChild.className);
-							if (! allTagged && !inherit) {
+							var href = inLink(root.firstChild.firstChild);
+							if (href) {
+							    var cur = xtdom.createElement(this.getDocument(), 'a'); // xtdom...
+								cur.innerHTML = root.firstChild.firstChild.innerHTML;
+								cur.setAttribute('href', href);
+								addClass(cur, root.firstChild.className);
+								addClass(cur, root.firstChild.firstChild.className);
+								root.firstChild.removeChild(root.firstChild.firstChild);
+							} else {
+							    var cur = root.firstChild.firstChild;
+								addClass(cur, root.firstChild.className);
+								addClass(cur, root.firstChild.firstChild.className); // try without
+								//alert(cur.outerHTML)
+							}
+							if (!allTagged && !inherit) {
 							    //alert('added 2')
-							    addClass(c, style);
+							    addClass(cur, style);
 							} else {
 							    //alert('removed')
-							    removeClass(c, style);
+							    removeClass(cur, style);
 							}
+							tempRoot.appendChild(cur);
 						}
 					}
 				} else {
@@ -445,7 +628,6 @@
 				} 
 			}
 			
-
 			var prev = tempRoot.firstChild;
 			root.appendChild(prev);
 			
@@ -453,9 +635,12 @@
 				if (prev.className === "") {
 				    prev.removeAttribute("class");
 				}
-			    if (equalClasses(prev, tempRoot.firstChild) || tempRoot.firstChild.innerHTML === "") {
+			    if (equalClasses(prev, tempRoot.firstChild) && equalTags(prev, tempRoot.firstChild)) {
+				    //alert(prev.outerHTML + "  " + tempRoot.firstChild.outerHTML)
 				    prev.innerHTML = prev.innerHTML + tempRoot.firstChild.innerHTML;
 					tempRoot.removeChild(tempRoot.firstChild);
+				} else if (tempRoot.firstChild.innerHTML === "") {
+				    tempRoot.removeChild(tempRoot.firstChild);
 				} else {
 				    prev = tempRoot.firstChild;
 				    root.appendChild(prev);
@@ -463,7 +648,7 @@
 			}
 			
 			
-		} catch (e) {alert(e)}
+		} catch (e) {alert('here '+  e)}
 			
 			//alert(this._handle.outerHTML)
 		},
@@ -492,16 +677,41 @@
 			  
 			  function callToEnrich(style) {
 			      return function() {
-				      _this.enrich(style);
+					  _this.enrich(style);
 				  };
 			  };
 			  
               xtdom.addEventListener(button, 'click', callToEnrich(style), false);  
 		  }
 		  
-		  var toggleButton = xtdom.createElement(this.getDocument(), 'span');
-		  toggleButton.setAttribute('style', 'color:blue; float:right;');
-		  toggleButton.innerHTML = 'Edit';
+
+		  var linkArea = xtdom.createElement(this.getDocument(), 'textarea');
+		  linkArea.setAttribute('class', 'url-box');
+		  var makeLinkButton = xtdom.createElement(this.getDocument(), 'span');
+		  //makeLinkButton.setAttribute('class', 'button-as-links');
+		  var innerLinkButton = xtdom.createElement(this.getDocument(), 'button');
+		  innerLinkButton.setAttribute('class', 'button-as-links');
+		  innerLinkButton.textContent = 'Link';
+		  var innerUnlinkButton = xtdom.createElement(this.getDocument(), 'button');
+		  innerUnlinkButton.setAttribute('class', 'button-as-links');
+		  innerUnlinkButton.textContent = 'Unlink';
+		  makeLinkButton.appendChild(innerLinkButton);
+		  makeLinkButton.appendChild(xtdom.createTextNode(this.getDocument(), ' / '));
+		  makeLinkButton.appendChild(innerUnlinkButton);
+		  xtdom.addEventListener(innerLinkButton, 'click', function () {_this.makeLink(linkArea, true); return false}, false);
+		  xtdom.addEventListener(innerUnlinkButton, 'click', function () {_this.makeLink(linkArea, false); return false}, false);
+		  linkArea.value = 'http://...';
+		  linkBox = xtdom.createElement(this.getDocument(), 'div');
+		  //linkArea.style.display = 'none';	
+          //makeLinkButton.style.display = 'none';	
+		  linkBox.appendChild(linkArea);
+		  linkBox.appendChild(makeLinkButton);
+		  buttons.appendChild(linkBox);
+
+		  var toggleButton = xtdom.createElement(this.getDocument(), 'div');
+		  toggleButton.setAttribute('style', 'float:right;');
+		  toggleButton.setAttribute('class', 'edit-button');
+		  toggleButton.textContent = 'Edit';
 		  this.toggleButton = toggleButton;
 		  
 		  xtdom.addEventListener(toggleButton, 'click', function () {toggleButtons(_this);}, false); 
@@ -526,8 +736,8 @@
 		  //this._handle.addEventListener('keydown', function() {_keyDownEvent()})
 		  		  
 		  this.editInProgress = true;		  
-		  this.buttonBox.style.display='block';
-		  this.toggleButton.setAttribute('style', 'color:blue; float:right; padding-top:20px;'); 
+		  this.buttonBox.style.display = 'block';
+		  this.toggleButton.textContent = 'Close';
 		  
           // avoid reentrant calls (e.g. user's click in the field while editing)
           //if (this.editInProgress === false) {
@@ -553,23 +763,12 @@
         stopEditing : function (isCancel) {
           if ((! this.stopInProgress) && (this.editInProgress !== false)) {
             this.stopInProgress = true;
-			this.buttonBox.style.display='none';
-			this.toggleButton.setAttribute('style', 'color:blue; float:right;');
+			this.buttonBox.style.display = 'none';
+			this.toggleButton.textContent = 'Edit';
+			//this.toggleButton.setAttribute('style', 'color:blue; float:right;');
             _timestamp = -1;
             this.keyboard.unregister(this, this.kbdHandlers);
             this.keyboard.release(this, this);
-            //xtdom.removeEventListener(this._handle, 'blur', this.blurHandler, false);
-            //_sanitize(this._handle, this.doc);
-            if (!isCancel) {
-              // user may have deleted all
-              // FIXME: we should also normalize in case of a paste that created garbage (like some <br/>)
-              this.update(this._handle.firstChild.firstChild ? this._handle.firstChild.firstChild.data : null);
-            } else {
-              // restores previous data model - do not call _setData because its like if there was no input validated
-              if (this._handle.firstChild) {
-                this._handle.firstChild = this.model;
-              }
-            }
             //this._handle.blur();
     //        xtdom.addClassName(this._handle, 'axel-core-editable');
             this.stopInProgress = false;
@@ -580,17 +779,17 @@
         // Updates the editor data model with the given data
         // This gives a chance to normalize the input
         update : function (aData) { 
-          if (aData === this.model) { // no change
+          /*if (handle === this.model) { // no change
             return;
           }
           // normalizes text (empty text is set to _defaultData)
-          if ((!aData) || (aData.search(/\S/) === -1) || (aData === this.getDefaultData())) {
+          if ((!handle) || (handle.innerHTML.search(/\S/) === -1) || (handle === this.getDefaultData())) {
             this.clear(true);
             return;
           }
-          this._setData(aData);
+          this._setData(handle);
           this.setModified(true);
-          this.set(true);
+          this.set(true);*/
         },
 
         // Clears the model and sets its data to the default data.
