@@ -28,6 +28,8 @@
   var _Editor = (function () {
   
     xtdom.extractDefaultContentXT = extractDefaultContentXT;
+	
+	var urlPattern = new RegExp(/[-a-zA-Z0-9@:%_\+.~#?&//=]{2,}\.[a-z]{2,}\b(\/[-a-zA-Z0-9@:%_\+.~#?&//=]*)?/gi);
 
     var _timestamp = -1;
 	
@@ -38,23 +40,6 @@
 	    {name : 'Underline', style : 'underline'},
 		{name : 'Strike', style : 'line-through'}
 	];
-	
-	function recognizedStyles() {
-	    var ret = []
-		for (fn in formatsAndCSS) {
-		    ret.push(fn.style);
-		}
-		return ret;
-	}
-	
-	var styles = recognizedStyles();
-	
-	var classToKind = { // Do we really need that translation ???
-	    'bold' : 'b',
-		'italics' : 'i',
-		'underline' : 'u',
-		'line-through': 'lt'
-	};
 
     function _focusAndSelect ( editor ) {
       // pre-condition: the editor's handle must already have focus
@@ -64,34 +49,28 @@
       catch (e) { }
     }
 
-    function _trim ( str ) {
-      var tmp = str.replace(/\s+/gi,' ');
-      if (/\s/.test(tmp.charAt(0))) {
-        tmp = tmp.substr(1);
-      }
-      if (/\s$/.test(tmp)) {
-        tmp = tmp.substr(0, tmp.length-1);
-      }
-      return tmp;
-    }
-
     // Checks node contains only a text node, otherwise recreate it
     // (this can be used to prevent cut and paste side effects)
-    function _sanitize ( node, doc ) {
-      var tmp = '';
-      if ((node.children.length > 1) || (node.firstChild && (node.firstChild.nodeType !== xtdom.TEXT_NODE))) {
-        // Detect whether the browser supports textContent or innerText
-        if (typeof node.textContent === 'string') {
-          tmp = node.textContent;
-        } else if (typeof node.innerText === 'string') {
-          tmp = node.innerText;
-        }
-        node.innerHTML = '';
-        t = xtdom.createTextNode(doc, tmp ? _trim(tmp) : tmp);
-        node.appendChild(t);
-      }
+    function _sanitize (pasteHTML, doc) {
+	  var span = xtdom.createElement(doc, 'span');
+	  span.innerHTML = pasteHTML;
+      return innerText(span);
 	  
     }
+	
+	function innerText(node) {
+	    if (node.nodeType == xtdom.TEXT_NODE) {
+		    return node.textContent;
+		} else if (node.childNodes) {
+		    var ret = "";
+		    for (var i = 0; i < node.childNodes.length; i++) {
+			   ret += innerText(node.childNodes[i]);
+			}
+			return ret;
+		} else {
+		    return ""
+		}
+	}
 	
 	/*
 	  Extracts the content of an XTiger node. We need a function different from the default
@@ -100,28 +79,12 @@
 	  the process. Our method keeps the CSS formatting of span subnodes mentionned in formatsAndCSS.
 	*/
 	function extractDefaultContentXT(node) {
-	  if (xtiger.ATTRIBUTE == xtdom.getNodeTypeXT(node)) {
-		var dump = node.getAttribute('default');
-		if (dump && (-1 === dump.search(/\S/)))  {
-		    return null;
-		}
-	  }
-	  
-	  function innerText(node) {
-	      if (node.nodeType == xtdom.TEXT_NODE) {
-		     return node.textContent;
-		  } else if (node.childNodes) {
-		      var ret = "";
-		      for (var i = 0; i < node.childNodes.length; i++) {
-			    ret += innerText(node.childNodes[i]);
-			  }
-			  return ret;
-		  } else {
-		      return ""
-		  }
-	  }
-	  
-	  //alert('here ' + node.outerHTML)
+	    if (xtiger.ATTRIBUTE == xtdom.getNodeTypeXT(node)) {
+		    var dump = node.getAttribute('default');
+		    if (dump && (-1 === dump.search(/\S/)))  {
+		        return null;
+		    }
+        }
 	  
 	  if (node.childNodes) {
 	    var root = document.createElement('span');
@@ -139,7 +102,6 @@
 		}
 	  }
 	  
-	  //alert('root ' + root.outerHTML);
 	  return root;
 	}
 
@@ -182,10 +144,7 @@
 	}
 	
 	function fragsToSpans(frags, doc) { // we should try to take into account ill-formed fragments...
-	    try {
 	    var root = xtdom.createElement(doc, 'span');
-	    //alert(frags.childNodes)
-		//var lowFrag = 'Fragment'.toLower().valueOf();
 		for (var i = 0; i < frags.childNodes.length; i++) {
 		    if (frags.childNodes[i].nodeType === Node.ELEMENT_NODE && frags.childNodes[i].tagName.toLowerCase() == 'fragment')  {
 			    var span = xtdom.createElement(doc, 'span');
@@ -195,22 +154,10 @@
 				}
 				var text = xtdom.createTextNode(doc, frags.childNodes[i].textContent);
 				span.appendChild(text);
-		        //alert(frags.childNodes[i].tagName)
 				root.appendChild(span);
 		    } 
 		}
-		} catch (e) {alert(e)}
-		//alert(root.outerHTML);
 		return root;
-	}
-	
-	function interceptPaste(event) {
-		if (window.clipboardData) {
-			alert('1: ' + JSON.stringify(window.clipboardData.getData("Text")));
-		} else {
-			alert('2: ' + JSON.stringify(event.clipboardData.getData('text/html')));
-		}
-		return false;
 	}
 	
 	function inheritClass(node, tag) {
@@ -241,25 +188,23 @@
 	}
 	
 	function addClass(node, tag) {
+	    if (! tag) {
+		    return;
+		}
 		if (! hasClass(node, tag)) {
 			node.className = (node.className + ' ' + tag).trim();
 		}
-		//alert(node.outerHTML)
 	}
 	
 	function removeClass(node, tag) {
-		//alert(node.outerHTML)	
         var className = (' ' + node.className + ' ').replace(' ' + tag + ' ', ' ').trim();		
 		node.className = className;
-		//alert(node.outerHTML)
 	}
 	
 	function equalClasses(primus, secundus) {
 		var pri = primus.className.match(/\S+/g);
 		var sec = secundus.className.match(/\S+/g);
-		
-		//alert(JSON.stringify(pri) + ' ' + JSON.stringify(sec)) 
-		
+
 		if (! pri) {
 			pri = [];
 		}
@@ -298,18 +243,37 @@
 	}
 	
 	function toggleButtons(instance) {
-	    try{
 	    if (instance.editInProgress) {
+		    instance.modal.style.display = 'none';
 		    instance.stopEditing();
-			xtdom.setAttribute(instance._handle, 'contenteditable', 'false');
 	    } else if (instance.getParam('noedit') !== 'true') {
           xtdom.setAttribute(instance._handle, 'contenteditable', 'true');
-          //xtdom.addClassName(instance._handle, 'axel-core-editable');
           _timestamp = new Date().getTime();
-		  instance._handle.addEventListener('paste', function (ev) {interceptPaste(ev); return false;})
+		  instance._handle.addEventListener('paste', function (ev) {instance.interceptPaste(ev); return false;})
 		  instance.startEditing();
         }
-		} catch (e) {alert('toggle ' + e)}
+	}
+	
+	function showModal(instance, text) {
+	    var modal = instance.modal;
+	    modal.textContent = text;
+		modal.style.display = 'block';
+		xtdom.setAttribute(instance._handle, 'contenteditable', 'false');
+		instance._handle.appendChild(modal);
+		var width = modal.style.width;
+		var height = modal.style.height;
+		instance._handle.style.position = 'relative';
+		var rect = instance._handle.getBoundingClientRect();
+		var left = (((rect.right - rect.left) - width) / 2.0) - 90;
+		var top = (((rect.bottom - rect.top) - height) / 2.0) - 30;
+		modal.style.position = 'absolute';
+		modal.style.top = top + 'px';
+		modal.style.left = left + 'px';
+		xtdom.addEventListener(modal, 'click', 
+		    function(ev) {
+			    modal.style.display='none';
+				xtdom.setAttribute(instance._handle, 'contenteditable', 'true');
+			});
 	}
 
     return {
@@ -319,27 +283,17 @@
       ////////////////////////
 
       onInit : function ( aDefaultData, anOptionAttr, aRepeater ) {
-	    try {
 	    var data = normalize(aDefaultData, this.getDocument());
         if (! data) { 
           this._content = '<span>Click to edit</span>'; // should make a function to ensure proper structure of the content
         }
-        this._setData(data);
-		/*while (this._handle.firstChild) {
-		    this._handle.removeChild(this._handle.firstChild);
-		}
-		while (data.firstChild) {
-		    this._handle.appendChild(data.firstChild);
-		}
-        this.model = data*/
-        //alert(this._handle.outerHTML)		
+        this._setData(data);	
         if (this.getParam('hasClass')) {
           xtdom.addClassName(this._handle, this.getParam('hasClass'));
         }
         this.keyboard = xtiger.session(this.getDocument()).load('keyboard');
         this.editInProgress = false;
 		this.createButtons();
-		} catch (e) {alert(e)}
       },
 
       // Awakes the editor to DOM's events, registering the callbacks for them
@@ -366,18 +320,15 @@
       onLoad : function (aPoint, aDataSrc) {
         var _value, _default;
         if (aPoint !== -1) { 
-          _value = fragsToSpans(aPoint[0], this.getDocument());//aDataSrc.getDataFor(aPoint);
+          _value = fragsToSpans(aPoint[0], this.getDocument());
           _default = this.getDefaultData();
           defval = _value || _default;
-		  //alert(this._handle.outerHTML)
           this._setData(defval);
-		  //alert(this._handle.outerHTML)
           this.setModified(_value !==  _default);
           this.set(false);
         } else {
           this.clear(false);
         }
-		//alert(this._handle.outerHTML)
       },
 
       onSave : function (aLogger) {
@@ -386,9 +337,7 @@
           return;
         }
         if (this._handle) {
-		  try {
 	      logSpansToFragments(this._handle, aLogger);
-		  } catch (e) {alert(e)}
         }
       },
 
@@ -423,8 +372,6 @@
 
         // Sets editor model value. Takes the handle and updates its DOM content.
         _setData : function (aData) {
-		  try {		
-		  //alert(aData.outerHTML)
 
 		  while (this._handle.firstChild) {
 		      this._handle.removeChild(this._handle.firstChild);
@@ -434,7 +381,6 @@
 		  }
 		  
           this.model = aData;
-		  } catch (e) {alert(e)}
 		  
         },
 
@@ -456,13 +402,107 @@
         doKeyUp : function (ev) { 
         },
 		
+		interceptPaste : function (event) {
+		
+			var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
+			
+		    var win = window.clipboardData ? window.clipboardData.getData("Text") : "";
+            var eventHTML = event.clipboardData ? event.clipboardData.getData('text/html') : "";
+			var eventText = event.clipboardData ? event.clipboardData.getData('text') : "";
+			if (eventHTML) {
+			    var content = _sanitize(eventHTML, this.getDocument());
+			} else {
+				var content = eventText;
+			}
+
+			var newNode = xtdom.createElement(this.getDocument(), 'span');
+			newNode.innerHTML = content;
+
+			range.insertNode(newNode)
+		
+		    var store = this._handle.innerHTML;
+			this._handle.innerHTML = store;
+			var _this = this;			
+			setTimeout(function() {_this.regularizePaste(store)}, 2);
+			
+		},
+		
+		regularizePaste : function (store) {
+			
+			var root = xtdom.createElement(this.getDocument(), 'span');
+			root.innerHTML = store;
+			
+			var tempRoot = xtdom.createElement(this.getDocument(), 'span');
+			
+			while (root.firstChild) {
+			    if (root.firstChild.firstChild) {
+				    while (root.firstChild.firstChild) {
+					    if (root.firstChild.firstChild.nodeType === xtdom.TEXT_NODE) {		
+                            var tag = root.firstChild.tagName;							
+						    var newFrag = xtdom.createElement(this.getDocument(), tag); // xtdom...
+							if (tag === 'a') {
+							    newFrag.setAttribute('href', root.firstChild.href);	
+							}
+							addClass(newFrag, root.firstChild.className);
+							addClass(newFrag, root.firstChild.firstChild.className); // is there any class name in this case ??
+							newFrag.appendChild(root.firstChild.firstChild);
+							tempRoot.appendChild(newFrag);
+						} else {
+						    if (root.firstChild.firstChild.tagName in ['a', 'span']) {								
+								var cur = root.firstChild.firstChild;
+								addClass(cur, root.firstChild.className);
+								addClass(cur, root.firstChild.firstChild.className);
+							} else {
+							    var tag = root.firstChild.tagName;
+							    var cur = xtdom.createElement(this.getDocument(), tag);
+								cur.innerHTML = root.firstChild.firstChild.innerHTML;
+								if (tag === 'a') {
+								    cur.setAttribute('href', root.firstChild.href);
+								}
+								addClass(cur, root.firstChild.className);
+								addClass(cur, root.firstChild.firstChild.className);
+								root.firstChild.removeChild(root.firstChild.firstChild);							    
+							}
+						    tempRoot.appendChild(cur);
+						}
+					}
+				} else {
+				    tempRoot.appendChild(root.firstChild);
+				} 
+			}
+			
+			this._handle.innerHTML = "";
+			
+			var prev = tempRoot.firstChild;
+			this._handle.appendChild(prev);
+			
+			while (tempRoot.firstChild) {
+				if (prev.className === "") {
+				    prev.removeAttribute("class");
+				}
+			    if (equalClasses(prev, tempRoot.firstChild) && equalTags(prev, tempRoot.firstChild)) {
+				    prev.innerHTML = prev.innerHTML + tempRoot.firstChild.innerHTML;
+					tempRoot.removeChild(tempRoot.firstChild);
+				} else if (tempRoot.firstChild.innerHTML === "") {
+				    tempRoot.removeChild(tempRoot.firstChild);
+				} else {
+				    prev = tempRoot.firstChild;
+				    this._handle.appendChild(prev);
+				}
+			}
+			
+	    },
+		
 		makeLink : function (urlNode, link) {
 		    var url = urlNode.value;
 			if (url.indexOf('http://') != 0 && url.indexOf('https://') != 0) {
 			    url = 'http://' + url;
 			}
 			
-			// we should check urls are valid
+			if (link && ! url.match(urlPattern)) {
+			    showModal(this, 'Choose a valid url.');
+			    return;
+			}
 			
 			if (link) {
 			    var mainTag = 'a';
@@ -476,23 +516,18 @@
 			}
 			var content = range.extractContents()
 			newNode.appendChild(content)
-			newNode.setAttribute('data-mark', 'new-l'); // test only
 			range.insertNode(newNode)
 			
 			var root = this._handle;
 			
-			//alert(root.outerHTML)
-			
-			var tempRoot = xtdom.createElement(this.getDocument(), 'span');
-            //tempRoot.setAttribute('href', url);
-			try {			
+			var tempRoot = xtdom.createElement(this.getDocument(), 'span');			
 
 			while (root.firstChild) {
 			    if (root.firstChild.firstChild) {
 				    while (root.firstChild.firstChild) {
 					    if (root.firstChild.firstChild.nodeType === xtdom.TEXT_NODE) {		
                             var tag = root.firstChild.tagName;						
-						    var newFrag = xtdom.createElement(this.getDocument(), tag); // xtdom...
+						    var newFrag = xtdom.createElement(this.getDocument(), tag);
 							if (tag === 'a') {
 							    newFrag.setAttribute('href', url);	
 							}
@@ -523,9 +558,6 @@
 				} 
 			}
 			
-			} catch (e) {alert(e)}
-			//alert(tempRoot.outerHTML)
-			
 			var prev = tempRoot.firstChild;
 			root.appendChild(prev);
 			
@@ -534,7 +566,6 @@
 				    prev.removeAttribute("class");
 				}
 			    if (equalClasses(prev, tempRoot.firstChild) && equalTags(prev, tempRoot.firstChild)) {
-				    //alert(prev.outerHTML + "--" + tempRoot.firstChild.outerHTML)
 				    prev.innerHTML = prev.innerHTML + tempRoot.firstChild.innerHTML;
 					tempRoot.removeChild(tempRoot.firstChild);
 				} else if (tempRoot.firstChild.innerHTML === "") {
@@ -544,28 +575,19 @@
 				    root.appendChild(prev);
 				}
 			}
-				
-            //alert(this._handle.outerHTML)
-
 		},
 		
 		enrich : function (style) {
-		
-		    //alert(style)
-			
-		 try { // temporary during tests
+
             var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
-			//alert(range)
+
 			var newNode = xtdom.createElement(this.getDocument(), 'span');
 			var content = range.extractContents()
 			newNode.appendChild(content)
 			
 			newNode.setAttribute('data-mark', 'new') 
 			
-			range.insertNode(newNode)
-			
-			//alert(this._handle.outerHTML)
-			//alert(newNode.outerHTML);
+			range.insertNode(newNode);
 
 			var root = this._handle;
 
@@ -582,8 +604,6 @@
 			}					
 			
 			var tempRoot = xtdom.createElement(this.getDocument(), 'span');	
-
-			//alert(this._handle.outerHTML)
 			
 			while (root.firstChild) {
 			    if (root.firstChild.firstChild) {
@@ -611,13 +631,10 @@
 							    var cur = root.firstChild.firstChild;
 								addClass(cur, root.firstChild.className);
 								addClass(cur, root.firstChild.firstChild.className); // try without
-								//alert(cur.outerHTML)
 							}
 							if (!allTagged && !inherit) {
-							    //alert('added 2')
 							    addClass(cur, style);
 							} else {
-							    //alert('removed')
 							    removeClass(cur, style);
 							}
 							tempRoot.appendChild(cur);
@@ -636,7 +653,6 @@
 				    prev.removeAttribute("class");
 				}
 			    if (equalClasses(prev, tempRoot.firstChild) && equalTags(prev, tempRoot.firstChild)) {
-				    //alert(prev.outerHTML + "  " + tempRoot.firstChild.outerHTML)
 				    prev.innerHTML = prev.innerHTML + tempRoot.firstChild.innerHTML;
 					tempRoot.removeChild(tempRoot.firstChild);
 				} else if (tempRoot.firstChild.innerHTML === "") {
@@ -646,21 +662,15 @@
 				    root.appendChild(prev);
 				}
 			}
-			
-			
-		} catch (e) {alert('here '+  e)}
-			
-			//alert(this._handle.outerHTML)
 		},
 		
 		createButtons : function () {
 		
-		  var buttons = xtdom.createElement(this.getDocument(), 'div');
+		  var container = xtdom.createElement(this.getDocument(), 'spanf');
+		
+		  var buttons = xtdom.createElement(this.getDocument(), 'span');
 
-		  buttons.setAttribute('style', 'display:none; padding-top:20px;');
-		  //buttons.setAttribute('class', 'axel-core-o');
-		  this._handle.parentNode.insertBefore(buttons, this._handle.nextSibling);
-          //alert(this._handle.outerHTML)		  
+		  buttons.setAttribute('style', 'display:none; padding-top:20px;');	  
 		  this.buttonBox = buttons;
 		  
 		  var _this = this;
@@ -687,8 +697,8 @@
 
 		  var linkArea = xtdom.createElement(this.getDocument(), 'textarea');
 		  linkArea.setAttribute('class', 'url-box');
+		  this.linkArea = linkArea;
 		  var makeLinkButton = xtdom.createElement(this.getDocument(), 'span');
-		  //makeLinkButton.setAttribute('class', 'button-as-links');
 		  var innerLinkButton = xtdom.createElement(this.getDocument(), 'button');
 		  innerLinkButton.setAttribute('class', 'button-as-links');
 		  innerLinkButton.textContent = 'Link';
@@ -702,13 +712,11 @@
 		  xtdom.addEventListener(innerUnlinkButton, 'click', function () {_this.makeLink(linkArea, false); return false}, false);
 		  linkArea.value = 'http://...';
 		  linkBox = xtdom.createElement(this.getDocument(), 'div');
-		  //linkArea.style.display = 'none';	
-          //makeLinkButton.style.display = 'none';	
 		  linkBox.appendChild(linkArea);
 		  linkBox.appendChild(makeLinkButton);
 		  buttons.appendChild(linkBox);
 
-		  var toggleButton = xtdom.createElement(this.getDocument(), 'div');
+		  var toggleButton = xtdom.createElement(this.getDocument(), 'span');
 		  toggleButton.setAttribute('style', 'float:right;');
 		  toggleButton.setAttribute('class', 'edit-button');
 		  toggleButton.textContent = 'Edit';
@@ -716,7 +724,16 @@
 		  
 		  xtdom.addEventListener(toggleButton, 'click', function () {toggleButtons(_this);}, false); 
 		  
-		  this._handle.parentNode.insertBefore(toggleButton, this._handle.nextSibling);
+		  container.appendChild(toggleButton);
+		  container.appendChild(buttons);
+		  
+		  this._handle.parentNode.insertBefore(container, this._handle.nextSibling);
+		  
+		  // Creation of a modal to display warnings
+	      var div = xtdom.createElement(this.getDocument(), 'div');
+		  div.setAttribute('class', 'modal');
+		  div.style.display = 'none';
+		  this.modal = div;
 	 
 		},
 		
@@ -728,34 +745,16 @@
 		  }
 
 		  var _this = this;
-		  
-		  //alert(this._handle.parentNode.outerHTML)
-		  
-		  //_test()
-		  
-		  //this._handle.addEventListener('keydown', function() {_keyDownEvent()})
 		  		  
 		  this.editInProgress = true;		  
 		  this.buttonBox.style.display = 'block';
 		  this.toggleButton.textContent = 'Close';
-		  
-          // avoid reentrant calls (e.g. user's click in the field while editing)
-          //if (this.editInProgress === false) {
-          //  this.editInProgress = true;
-            // registers to keyboard events
-            this.kbdHandlers = this.keyboard.register(this);
-            this.keyboard.grab(this, this);
-    //        xtdom.removeClassName(this._handle, 'axel-core-editable');
-            if ((!this.isModified()) || ((_timestamp !== -1) && ((_timestamp - new Date().getTime()) < 100))) {
-              /*if (xtiger.cross.UA.webKit) {
-                // it seems on webkit the contenteditable will really be focused after callbacks return
-                setTimeout(this.doSelectAllCb, 100);
-              } else {
-                _focusAndSelect(this); 
-              }*/
-            //}
-            // must be called at the end as on FF 'blur' is triggered when grabbing
-            xtdom.addEventListener(this._handle, 'blur', this.blurHandler, false);
+		  this.linkArea.value = 'http://...';
+
+          this.kbdHandlers = this.keyboard.register(this);
+          this.keyboard.grab(this, this);
+          if ((!this.isModified()) || ((_timestamp !== -1) && ((_timestamp - new Date().getTime()) < 100))) {
+               xtdom.addEventListener(this._handle, 'blur', this.blurHandler, false);
           }
         },
 
@@ -765,12 +764,10 @@
             this.stopInProgress = true;
 			this.buttonBox.style.display = 'none';
 			this.toggleButton.textContent = 'Edit';
-			//this.toggleButton.setAttribute('style', 'color:blue; float:right;');
+			xtdom.setAttribute(this._handle, 'contenteditable', 'false');
             _timestamp = -1;
             this.keyboard.unregister(this, this.kbdHandlers);
             this.keyboard.release(this, this);
-            //this._handle.blur();
-    //        xtdom.addClassName(this._handle, 'axel-core-editable');
             this.stopInProgress = false;
             this.editInProgress = false;
           }
@@ -779,17 +776,6 @@
         // Updates the editor data model with the given data
         // This gives a chance to normalize the input
         update : function (aData) { 
-          /*if (handle === this.model) { // no change
-            return;
-          }
-          // normalizes text (empty text is set to _defaultData)
-          if ((!handle) || (handle.innerHTML.search(/\S/) === -1) || (handle === this.getDefaultData())) {
-            this.clear(true);
-            return;
-          }
-          this._setData(handle);
-          this.setModified(true);
-          this.set(true);*/
         },
 
         // Clears the model and sets its data to the default data.
@@ -803,23 +789,6 @@
         },
 
         handleBlur : function (ev) {
-		    //alert(document.activeElement.contentDocument.activeElement)
-		    //_this.stopEditing(false);
-		  //this.buttonBox.focus();
-		  //alert('ok')
-		 /* var _this = this;
-		  setTimeout(function () {
-		      //alert('handle ' + _this.buttonBox.clicked);
-			  if (_this.buttonBox.clicked) {
-			      //alert('clicked');
-				  _this.enrich(_this.buttonBox.clicked);
-				  //_this.buttonBox.clicked = undefined;
-			  } else {
-			      //alert('stop');
-			      
-			  }}, 100);*/
-		  //this.buttonBox.addEventListener
-		  //setTimeout(function () {alert('handle ' + document.activeElement)}, 500)
         }
       }
     };

@@ -204,8 +204,8 @@ xtiger.util.DOMLogger.prototype = {
    // FIXME: sanity check this.curTop ?
     if (this.curAttr) {
       this.curTop.addAttribute(this.curAttr, text);
-    } else {            
-      var n = new xtiger.util.PseudoNode(xtiger.util.PseudoNode.TEXT_NODE, text);    
+    } else {   	
+      var n = new xtiger.util.PseudoNode(xtiger.util.PseudoNode.TEXT_NODE, text);  	  
       this.curTop.addChild (n);
    }
   },
