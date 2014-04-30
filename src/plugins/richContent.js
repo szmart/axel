@@ -242,39 +242,126 @@
 		}
 	}
 	
-	function toggleButtons(instance) {
-	    if (instance.editInProgress) {
-		    instance.modal.style.display = 'none';
-		    instance.stopEditing();
-	    } else if (instance.getParam('noedit') !== 'true') {
-          xtdom.setAttribute(instance._handle, 'contenteditable', 'true');
-          _timestamp = new Date().getTime();
-		  instance._handle.addEventListener('paste', function (ev) {instance.interceptPaste(ev); return false;})
-		  instance.startEditing();
-        }
+	function toggleButtons() {
+	    try {
+	    if (_currentInstance.editInProgress) {
+		    //_currentInstance.modal.style.display = 'none';
+			//_buttons.style.display = 'none';
+		    //_currentInstance.stopEditing(false);
+			_currentInstance._handle.parentNode.removeChild(_buttons);
+			_currentInstance.stopEditing(false);
+	    } 
+		} catch (e) {alert(e)}
+	}
+	
+	var _modal = createModal();
+	
+	function createModal() {
+		  // Creation of a modal to display warnings
+	      var div = document.createElement('div'); //xtdom.createElement(instance.getDocument(), 'div');
+		  div.setAttribute('class', 'modal');
+		  div.style.display = 'none';
+	      return div;
 	}
 	
 	function showModal(instance, text) {
-	    var modal = instance.modal;
-	    modal.textContent = text;
-		modal.style.display = 'block';
+	    _modal.textContent = text;
+		_modal.style.display = 'block';
 		xtdom.setAttribute(instance._handle, 'contenteditable', 'false');
-		instance._handle.appendChild(modal);
-		var width = modal.style.width;
-		var height = modal.style.height;
+		instance._handle.appendChild(_modal);
+		var width = _modal.style.width;
+		var height = _modal.style.height;
 		instance._handle.style.position = 'relative';
 		var rect = instance._handle.getBoundingClientRect();
 		var left = (((rect.right - rect.left) - width) / 2.0) - 90;
 		var top = (((rect.bottom - rect.top) - height) / 2.0) - 30;
-		modal.style.position = 'absolute';
-		modal.style.top = top + 'px';
-		modal.style.left = left + 'px';
-		xtdom.addEventListener(modal, 'click', 
+		_modal.style.position = 'absolute';
+		_modal.style.top = top + 'px';
+		_modal.style.left = left + 'px';
+		xtdom.addEventListener(_modal, 'click', 
 		    function(ev) {
-			    modal.style.display='none';
+			    _modal.style.display='none';
 				xtdom.setAttribute(instance._handle, 'contenteditable', 'true');
 			});
 	}
+	
+	var _buttons = createButtons();
+	
+	var _currentInstance = null;
+	
+	
+	function registerEditor(instance) {
+	    try {
+	    _currentInstance = instance;
+		_buttons.linkArea.value = 'http://...';
+		_currentInstance._handle.parentNode.appendChild(_buttons);
+		} catch (e) {alert(e)}
+	}
+	
+	function createButtons() {
+		
+		  var container = document.createElement('span');//xtdom.createElement(instance.getDocument(), 'span');
+		
+		  var buttons = document.createElement('span');//xtdom.createElement(instance.getDocument(), 'span');
+
+		  //buttons.setAttribute('style', 'display:none; padding-top:20px;');
+          container.setAttribute('class', 'buttons-container');
+
+		  
+		  for (var i = 0; i < formatsAndCSS.length; i++) {
+		      var button = document.createElement('button');//xtdom.createElement(instance.getDocument(), 'button');
+			  button.setAttribute('class', 'button-as-links');
+			  var inner = document.createElement('span'); //xtdom.createElement(instance.getDocument(), 'span');
+			  var style = formatsAndCSS[i].style;
+			  inner.setAttribute('class', style);
+			  inner.textContent = formatsAndCSS[i].name;
+		      button.appendChild(inner);
+		      buttons.appendChild(button);	
+			  
+			  function callToEnrich(style) {
+			      return function() {
+					  _currentInstance.enrich(style);
+				  };
+			  };
+			  
+              xtdom.addEventListener(button, 'click', callToEnrich(style), false);  
+		  }
+		  
+
+		  var linkArea = document.createElement('textarea'); //xtdom.createElement(instance.getDocument(), 'textarea');
+		  linkArea.setAttribute('class', 'url-box');
+		  container.linkArea = linkArea;
+		  var makeLinkButton = document.createElement('span'); //xtdom.createElement(instance.getDocument(), 'span');
+		  var innerLinkButton = document.createElement('button'); //xtdom.createElement(instance.getDocument(), 'button');
+		  innerLinkButton.setAttribute('class', 'button-as-links');
+		  innerLinkButton.textContent = 'Link';
+		  var innerUnlinkButton = document.createElement('button'); //xtdom.createElement(instance.getDocument(), 'button');
+		  innerUnlinkButton.setAttribute('class', 'button-as-links');
+		  innerUnlinkButton.textContent = 'Unlink';
+		  makeLinkButton.appendChild(innerLinkButton);
+		  makeLinkButton.appendChild(document.createTextNode(' / '));
+		  makeLinkButton.appendChild(innerUnlinkButton);
+		  xtdom.addEventListener(innerLinkButton, 'click', function () {_currentInstance.makeLink(linkArea, true); return false}, false);
+		  xtdom.addEventListener(innerUnlinkButton, 'click', function () {_currentInstance.makeLink(linkArea, false); return false}, false);
+		  linkArea.value = 'http://...';
+		  linkBox = document.createElement('div'); // xtdom.createElement(instance.getDocument(), 'div');
+		  linkBox.appendChild(linkArea);
+		  linkBox.appendChild(makeLinkButton);
+		  buttons.appendChild(linkBox);
+
+		  var toggleButton = document.createElement('button'); //xtdom.createElement(instance.getDocument(), 'span');
+		  toggleButton.setAttribute('class', 'button-as-links');
+		  toggleButton.textContent = 'Close';
+		  buttons.toggleButton = toggleButton;
+		  
+		  xtdom.addEventListener(toggleButton, 'click', function () {_currentInstance.stopEditing(false);}, false); 
+		  
+		  
+		  container.appendChild(buttons);
+		  container.appendChild(toggleButton);
+		  
+		  return container;
+		}
 
     return {
 
@@ -293,12 +380,12 @@
         }
         this.keyboard = xtiger.session(this.getDocument()).load('keyboard');
         this.editInProgress = false;
-		this.createButtons();
       },
 
       // Awakes the editor to DOM's events, registering the callbacks for them
       onAwake : function () {
-        /*var _this = this;
+	    xtdom.addClassName(this._handle, 'axel-core-editable');
+        var _this = this;
         if (this.getParam('noedit') !== 'true') {
           xtdom.setAttribute(this._handle, 'contenteditable', 'true');
           xtdom.addClassName(this._handle, 'axel-core-editable');
@@ -314,7 +401,8 @@
           }
           // TODO: instant paste cleanup by tracking 'DOMNodeInserted' and merging each node inserted ?
         }
-        this.blurHandler = function (ev) { _this.handleBlur(ev); };*/
+        this.blurHandler = function (ev) { _this.handleBlur(ev); };
+		//alert('awake')
       },
 
       onLoad : function (aPoint, aDataSrc) {
@@ -664,97 +752,26 @@
 			}
 		},
 		
-		createButtons : function () {
-		
-		  var container = xtdom.createElement(this.getDocument(), 'spanf');
-		
-		  var buttons = xtdom.createElement(this.getDocument(), 'span');
-
-		  buttons.setAttribute('style', 'display:none; padding-top:20px;');	  
-		  this.buttonBox = buttons;
-		  
-		  var _this = this;
-		  
-		  for (var i = 0; i < formatsAndCSS.length; i++) {
-		      var button = xtdom.createElement(this.getDocument(), 'button');
-			  button.setAttribute('class', 'button-as-links');
-			  var inner = xtdom.createElement(this.getDocument(), 'span');
-			  var style = formatsAndCSS[i].style;
-			  inner.setAttribute('class', style);
-			  inner.textContent = formatsAndCSS[i].name;
-		      button.appendChild(inner);
-		      buttons.appendChild(button);	
-			  
-			  function callToEnrich(style) {
-			      return function() {
-					  _this.enrich(style);
-				  };
-			  };
-			  
-              xtdom.addEventListener(button, 'click', callToEnrich(style), false);  
-		  }
-		  
-
-		  var linkArea = xtdom.createElement(this.getDocument(), 'textarea');
-		  linkArea.setAttribute('class', 'url-box');
-		  this.linkArea = linkArea;
-		  var makeLinkButton = xtdom.createElement(this.getDocument(), 'span');
-		  var innerLinkButton = xtdom.createElement(this.getDocument(), 'button');
-		  innerLinkButton.setAttribute('class', 'button-as-links');
-		  innerLinkButton.textContent = 'Link';
-		  var innerUnlinkButton = xtdom.createElement(this.getDocument(), 'button');
-		  innerUnlinkButton.setAttribute('class', 'button-as-links');
-		  innerUnlinkButton.textContent = 'Unlink';
-		  makeLinkButton.appendChild(innerLinkButton);
-		  makeLinkButton.appendChild(xtdom.createTextNode(this.getDocument(), ' / '));
-		  makeLinkButton.appendChild(innerUnlinkButton);
-		  xtdom.addEventListener(innerLinkButton, 'click', function () {_this.makeLink(linkArea, true); return false}, false);
-		  xtdom.addEventListener(innerUnlinkButton, 'click', function () {_this.makeLink(linkArea, false); return false}, false);
-		  linkArea.value = 'http://...';
-		  linkBox = xtdom.createElement(this.getDocument(), 'div');
-		  linkBox.appendChild(linkArea);
-		  linkBox.appendChild(makeLinkButton);
-		  buttons.appendChild(linkBox);
-
-		  var toggleButton = xtdom.createElement(this.getDocument(), 'span');
-		  toggleButton.setAttribute('style', 'float:right;');
-		  toggleButton.setAttribute('class', 'edit-button');
-		  toggleButton.textContent = 'Edit';
-		  this.toggleButton = toggleButton;
-		  
-		  xtdom.addEventListener(toggleButton, 'click', function () {toggleButtons(_this);}, false); 
-		  
-		  container.appendChild(toggleButton);
-		  container.appendChild(buttons);
-		  
-		  this._handle.parentNode.insertBefore(container, this._handle.nextSibling);
-		  
-		  // Creation of a modal to display warnings
-	      var div = xtdom.createElement(this.getDocument(), 'div');
-		  div.setAttribute('class', 'modal');
-		  div.style.display = 'none';
-		  this.modal = div;
-	 
-		},
-		
 
         // Starts editing the field (to be called once detected)
         startEditing : function () {
-		  if (this.editInProgress) {
-		      return;
-		  }
-
-		  var _this = this;
-		  		  
-		  this.editInProgress = true;		  
-		  this.buttonBox.style.display = 'block';
-		  this.toggleButton.textContent = 'Close';
-		  this.linkArea.value = 'http://...';
-
-          this.kbdHandlers = this.keyboard.register(this);
-          this.keyboard.grab(this, this);
-          if ((!this.isModified()) || ((_timestamp !== -1) && ((_timestamp - new Date().getTime()) < 100))) {
-               xtdom.addEventListener(this._handle, 'blur', this.blurHandler, false);
+          if (this.editInProgress === false) {
+            this.editInProgress = true;
+			registerEditor(this);
+            // registers to keyboard events
+            this.kbdHandlers = this.keyboard.register(this);
+            this.keyboard.grab(this, this);
+    //        xtdom.removeClassName(this._handle, 'axel-core-editable');
+            /*if ((!this.isModified()) || ((_timestamp !== -1) && ((_timestamp - new Date().getTime()) < 100))) {
+              if (xtiger.cross.UA.webKit) {
+                // it seems on webkit the contenteditable will really be focused after callbacks return
+                setTimeout(this.doSelectAllCb, 100);
+              } else {
+                _focusAndSelect(this); 
+              }
+            }*/
+            // must be called at the end as on FF 'blur' is triggered when grabbing
+            xtdom.addEventListener(this._handle, 'blur', this.blurHandler, false);
           }
         },
 
@@ -762,14 +779,32 @@
         stopEditing : function (isCancel) {
           if ((! this.stopInProgress) && (this.editInProgress !== false)) {
             this.stopInProgress = true;
-			this.buttonBox.style.display = 'none';
-			this.toggleButton.textContent = 'Edit';
-			xtdom.setAttribute(this._handle, 'contenteditable', 'false');
             _timestamp = -1;
             this.keyboard.unregister(this, this.kbdHandlers);
             this.keyboard.release(this, this);
+            xtdom.removeEventListener(this._handle, 'blur', this.blurHandler, false);
+            //_sanitize(this._handle, this.doc);
+            if (!isCancel) {
+              // user may have deleted all
+              // FIXME: we should also normalize in case of a paste that created garbage (like some <br/>)
+              this.update(this._handle.firstChild ? this._handle.firstChild.data : null);
+            } else {
+              // restores previous data model - do not call _setData because its like if there was no input validated
+              if (this._handle.firstChild) {
+                this._handle.firstChild.data = this.model;
+              }
+            }
+            this._handle.blur();
+    //        xtdom.addClassName(this._handle, 'axel-core-editable');
             this.stopInProgress = false;
             this.editInProgress = false;
+             
+			try {
+			 _currentInstance._handle.parentNode.removeChild(_buttons);
+			 _currentInstance.stopEditing(false);
+			 
+			} catch (e) {alert(e)}
+
           }
         },
 

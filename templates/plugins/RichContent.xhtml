@@ -11,8 +11,7 @@
 
     <style type="text/css">
       .axel-core-editable[contenteditable] {
-        border: none !important;
-        outline: 0px solid transparent;
+        boutline: thin dashed #bbffdd;
       }
       .multi {
         -moz-column-count: 2;
@@ -89,13 +88,29 @@
 	
 	.modal {
 		display: none;
-	    background: #DFDFD0;
+	    background-color: #DFDFD0;
 	    padding: 30px;
 	    border: 1px solid black;
         -moz-border-radius: 5px;
         border-radius: 5px;
 	    float: left;
 	    font-size: 12pt;
+	    z-index: 99999;
+		box-shadow: 2px 2px 1px #888888;
+		-moz-box-shadow: 2px 2px 1px #888888;
+		-webkit-box-shadow: 2px 2px 1px #888888;
+	}
+	
+	
+	.buttons-container {
+		padding:20px; 
+		position: fixed; 
+		top: 30px; 
+		right: 20px;
+	    background-color: #F0F0F0;
+	    border: 1px solid black;
+        -moz-border-radius: 5px;
+        border-radius: 5px;
 	    z-index: 99999;
 		box-shadow: 2px 2px 1px #888888;
 		-moz-box-shadow: 2px 2px 1px #888888;
