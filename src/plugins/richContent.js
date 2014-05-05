@@ -40,6 +40,39 @@
 	    {name : 'Underline', style : 'underline'},
 		{name : 'Strike', style : 'line-through'}
 	];
+	
+	function _formats() {
+	    var ret = []
+	    for (var i = 0; i < formatsAndCSS.length; i++) {
+		    ret.push(formatsAndCSS[i].style);
+		}
+		return ret;
+	}
+	
+	var allowedCSS = _formats();
+	
+	var dataConfigS = {
+	    spans : {
+	        link : {tag: 'a', ref : 'href', style: 'class'},
+		    standard : {tag: 'span', style: 'class'}
+	    },
+	    fragments : {
+	        link : {tag: 'Link', ref : 'Ref', style: 'RichStyle'},
+		    standard : {tag: 'Fragment', style: 'RichStyle'}
+	    }
+    }		
+	
+	dataConfig = dataConfigS['spans'];
+	
+	var _getPopupDevice = function (aDocument) {
+	   var devKey = 'popupdevice';
+	   var device = xtiger.session(aDocument).load(devKey);
+	   if (! device) {  // lazy creation
+		 device = new xtiger.editor.PopupDevice (aDocument); // hard-coded device for this model
+		 xtiger.session(aDocument).save(devKey, device);
+	   }
+	   return device;
+    };
 
     function _focusAndSelect ( editor ) {
       // pre-condition: the editor's handle must already have focus
@@ -91,15 +124,32 @@
 		var cur;
 		while (node.firstChild) {
 		    cur = node.firstChild;
-			if (cur.nodeType === xtdom.ELEMENT_NODE && (cur.tagName === 'span' || cur.tagName === 'a')) {
-			    root.appendChild(cur);
-			} else {
+			if (cur.nodeType === xtdom.ELEMENT_NODE && cur.tagName === dataConfig.standard.tag) {
 			    var span = document.createElement('span');
 				span.innerHTML = innerText(node.firstChild);
+				var style = cur.getAttribute(dataConfig.standard.style);
+				if (style && allowedCSS.indexOf(style) !== -1) {
+				    span.setAttribute('class', style);
+				}
 				node.removeChild(node.firstChild);
-				root.appendChild(span);
+				root.appendChild(span);			
+			} else 	if (cur.nodeType === xtdom.ELEMENT_NODE && cur.tagName === dataConfig.link.tag) {
+			    var a = document.createElement('a');
+				a.setAttribute('href', cur.getAttribute(dataConfig.link.ref));
+				a.innerHTML = innerText(node.firstChild);
+				var style = cur.getAttribute(dataConfig.link.style);
+				if (style && allowedCSS.indexOf(style) !== -1) {
+				    a.setAttribute('class', style);
+				}
+				node.removeChild(node.firstChild);
+				root.appendChild(a);			
+			} else {
+			    node.removeChild(node.firstChild);
 			}
 		}
+	  } else {
+	    var root = document.createElement('span');
+		root.innerHTML = innerText(node);
 	  }
 	  
 	  return root;
@@ -108,12 +158,12 @@
 	
 	function normalize(content, doc) {
 	    // TODO should normalize ill-formed data as much as possible
+		
 		if (typeof content === typeof 'abc') {
 		    var span = xtdom.createElement(doc, 'span');
 			span.innerHTML = content;
 			return span;
 		}
-		
 		return content;
 	}
 	
@@ -123,19 +173,32 @@
 	
 	function logSpansToFragments(root, logger) {
 		for (var i = 0; i < root.childNodes.length; i++) {
-		    logger.openTag('Fragment');
-			if (root.childNodes[i].className) {
-			    logger.openAttribute('RichStyle');
-			    logger.write(classToFragStyle(root.childNodes[i].className));
-				logger.closeAttribute('RichStyle');
-			}
 			if (root.childNodes[i].tagName === 'a' && root.childNodes[i].href) {
-			    logger.openAttribute('Href');
-			    logger.write(root.childNodes[i].href);
-				logger.closeAttribute('Href');			    
+			    logger.openTag(dataConfig.link.tag);
+				//logger.openTag('LinkText');
+			    if (root.childNodes[i].className) {
+			        logger.openAttribute(dataConfig.link.style);
+			        logger.write(classToFragStyle(root.childNodes[i].className));
+				    logger.closeAttribute(dataConfig.link.style);
+				}
+				//logger.closeTag('LinkText');
+				//logger.openTag('LinkRef');
+				logger.openAttribute(dataConfig.link.ref);
+				logger.write(root.childNodes[i].href);
+				//logger.closeTag('LinkRef');
+				logger.closeAttribute(dataConfig.link.ref);
+				logger.write(root.childNodes[i].textContent);
+			    logger.closeTag(dataConfig.link.tag);			    
+			} else if (root.childNodes[i].tagName === 'span') {
+			    logger.openTag(dataConfig.standard.tag);
+			    if (root.childNodes[i].className) {
+			        logger.openAttribute(dataConfig.standard.style);
+			        logger.write(classToFragStyle(root.childNodes[i].className));
+				    logger.closeAttribute(dataConfig.standard.style);
+				}
+				logger.write(root.childNodes[i].textContent);
+				logger.closeTag(dataConfig.standard.tag);
 			}
-			logger.write(root.childNodes[i].textContent);
-			logger.closeTag('Fragment');
 		}
 	}
 	
@@ -243,15 +306,10 @@
 	}
 	
 	function toggleButtons() {
-	    try {
 	    if (_currentInstance.editInProgress) {
-		    //_currentInstance.modal.style.display = 'none';
-			//_buttons.style.display = 'none';
-		    //_currentInstance.stopEditing(false);
 			_currentInstance._handle.parentNode.removeChild(_buttons);
 			_currentInstance.stopEditing(false);
 	    } 
-		} catch (e) {alert(e)}
 	}
 	
 	var _modal = createModal();
@@ -291,16 +349,41 @@
 	
 	
 	function registerEditor(instance) {
-	    try {
 	    _currentInstance = instance;
 		_buttons.linkArea.value = 'http://...';
 		_currentInstance._handle.parentNode.appendChild(_buttons);
-		} catch (e) {alert(e)}
 	}
 	
 	function createButtons() {
 		
-		  var container = document.createElement('span');//xtdom.createElement(instance.getDocument(), 'span');
+		  var container = document.createElement('div');//xtdom.createElement(instance.getDocument(), 'span');
+		  /*container.setAttribute('draggable', 'true');
+		  function dragStart(ev) {
+		      container.offsetX = parseInt(ev.clientX) - container.style.left;
+			  container.offsetY = parseInt(ev.clientY) - container.style.top;
+			  ev.dataTransfer.effectsAllowed = "copy";
+			  ev.dataTransfer.setData('text/html', this.innerHTML);
+			  console.log('start')
+		  }
+		  
+		  function dragover(ev) {
+		      console.log('over')
+			  //container.innerHTML = "<span>drop</span>"
+		      try {
+              //ev.stopPropagation();
+		      //container.style.right = parseInt(ev.clientX) - container.offsetX;
+			  //container.style.top = parseInt(ev.clientY) - container.offsetY;
+			  } catch (e) {console.log(e)}
+          }
+		  
+		  function drop(ev) {
+			  console.log('drop')
+			  
+          }
+		  xtdom.addEventListener(container, 'dragstart', function (ev) {dragStart(ev);return false;}, false);
+		  xtdom.addEventListener(container, 'dragover', function (ev) {dragover(ev);}, false);
+		  xtdom.addEventListener(container, 'drop', function(ev) {drop(ev);}, false);
+		  */
 		
 		  var buttons = document.createElement('span');//xtdom.createElement(instance.getDocument(), 'span');
 
@@ -373,7 +456,9 @@
 	    var data = normalize(aDefaultData, this.getDocument());
         if (! data) { 
           this._content = '<span>Click to edit</span>'; // should make a function to ensure proper structure of the content
-        }
+        } else {
+		  this._content = data.cloneNode(true);
+		}
         this._setData(data);	
         if (this.getParam('hasClass')) {
           xtdom.addClassName(this._handle, this.getParam('hasClass'));
@@ -392,7 +477,9 @@
           // 'mousedown' always preceeds 'focus', saves shiftKey timestamp to detect it in forthcoming 'focus' event
           xtdom.addEventListener(this._handle, 'mousedown', function(ev) { if (ev.shiftKey) { _timestamp = new Date().getTime(); } }, true);
           // tracks 'focus' event in case focus is gained with tab navigation  (no shiftKey)
-          xtdom.addEventListener(this._handle, 'focus', function(ev) {  _this.startEditing(); }, true);
+		  for (var i = 0; i < this._handle.childNodes.length; i++) {
+              xtdom.addEventListener(this._handle.childNodes[i], 'click', function(ev) {  _this.startEditing(ev); }, true);
+		  }
           if (xtiger.cross.UA.gecko) {  // gecko: prevent browser from selecting contentEditable parent in triple clicks ! 
             xtdom.addEventListener(this._handle, 'mousedown', function(ev) { if (ev.detail >= 3) { xtdom.preventDefault(ev);xtdom.stopPropagation(ev);_this._handle.focus();_focusAndSelect(_this); } }, true);
           }
@@ -402,13 +489,12 @@
           // TODO: instant paste cleanup by tracking 'DOMNodeInserted' and merging each node inserted ?
         }
         this.blurHandler = function (ev) { _this.handleBlur(ev); };
-		//alert('awake')
       },
 
       onLoad : function (aPoint, aDataSrc) {
         var _value, _default;
         if (aPoint !== -1) { 
-          _value = fragsToSpans(aPoint[0], this.getDocument());
+          _value = normalize(aPoint[0], this.getDocument());
           _default = this.getDefaultData();
           defval = _value || _default;
           this._setData(defval);
@@ -460,7 +546,7 @@
 
         // Sets editor model value. Takes the handle and updates its DOM content.
         _setData : function (aData) {
-
+		
 		  while (this._handle.firstChild) {
 		      this._handle.removeChild(this._handle.firstChild);
 		  }
@@ -494,13 +580,12 @@
 		
 			var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
 			
-		    var win = window.clipboardData ? window.clipboardData.getData("Text") : "";
-            var eventHTML = event.clipboardData ? event.clipboardData.getData('text/html') : "";
+		    var winText = window.clipboardData ? window.clipboardData.getData("Text") : "";
 			var eventText = event.clipboardData ? event.clipboardData.getData('text') : "";
 			if (eventHTML) {
-			    var content = _sanitize(eventHTML, this.getDocument());
+			    var content = eventText;
 			} else {
-				var content = eventText;
+				var content = winText;
 			}
 
 			var newNode = xtdom.createElement(this.getDocument(), 'span');
@@ -513,6 +598,28 @@
 			var _this = this;			
 			setTimeout(function() {_this.regularizePaste(store)}, 2);
 			
+		},
+		
+	    cleanTree : function (target, current) {
+			var prev = current.firstChild;
+			target.appendChild(prev);
+		
+			while (current.firstChild) {
+				if (prev.className === "") {
+					prev.removeAttribute("class");
+				}
+				if (equalClasses(prev, current.firstChild) && equalTags(prev, current.firstChild)) {
+					prev.innerHTML = prev.innerHTML + current.firstChild.innerHTML;
+					current.removeChild(current.firstChild);
+				} else if (current.firstChild.innerHTML === "") {
+					current.removeChild(current.firstChild);
+				} else {
+					prev = current.firstChild;
+					target.appendChild(prev);
+					var _this = this;
+					xtdom.addEventListener(prev, 'click', function(ev) {  _this.startEditing(ev); }, true);
+				}
+			}
 		},
 		
 		regularizePaste : function (store) {
@@ -561,23 +668,7 @@
 			
 			this._handle.innerHTML = "";
 			
-			var prev = tempRoot.firstChild;
-			this._handle.appendChild(prev);
-			
-			while (tempRoot.firstChild) {
-				if (prev.className === "") {
-				    prev.removeAttribute("class");
-				}
-			    if (equalClasses(prev, tempRoot.firstChild) && equalTags(prev, tempRoot.firstChild)) {
-				    prev.innerHTML = prev.innerHTML + tempRoot.firstChild.innerHTML;
-					tempRoot.removeChild(tempRoot.firstChild);
-				} else if (tempRoot.firstChild.innerHTML === "") {
-				    tempRoot.removeChild(tempRoot.firstChild);
-				} else {
-				    prev = tempRoot.firstChild;
-				    this._handle.appendChild(prev);
-				}
-			}
+			this.cleanTree(this._handle, tempRoot);
 			
 	    },
 		
@@ -646,24 +737,17 @@
 				} 
 			}
 			
-			var prev = tempRoot.firstChild;
-			root.appendChild(prev);
+			this._handle.innerHTML = "";
 			
-			while (tempRoot.firstChild) {
-				if (prev.className === "") {
-				    prev.removeAttribute("class");
-				}
-			    if (equalClasses(prev, tempRoot.firstChild) && equalTags(prev, tempRoot.firstChild)) {
-				    prev.innerHTML = prev.innerHTML + tempRoot.firstChild.innerHTML;
-					tempRoot.removeChild(tempRoot.firstChild);
-				} else if (tempRoot.firstChild.innerHTML === "") {
-				    tempRoot.removeChild(tempRoot.firstChild);
-				} else {
-				    prev = tempRoot.firstChild;
-				    root.appendChild(prev);
-				}
-			}
+			this.cleanTree(this._handle, tempRoot);
 		},
+		
+		/*
+		A normalized tree should be made of a root containing a list of paragraphs, 
+		containing a list of lines, containing a list of fragments or links.
+		
+		*/
+		
 		
 		enrich : function (style) {
 
@@ -672,8 +756,6 @@
 			var newNode = xtdom.createElement(this.getDocument(), 'span');
 			var content = range.extractContents()
 			newNode.appendChild(content)
-			
-			newNode.setAttribute('data-mark', 'new') 
 			
 			range.insertNode(newNode);
 
@@ -733,28 +815,35 @@
 				} 
 			}
 			
-			var prev = tempRoot.firstChild;
-			root.appendChild(prev);
+			this._handle.innerHTML = "";
 			
-			while (tempRoot.firstChild) {
-				if (prev.className === "") {
-				    prev.removeAttribute("class");
-				}
-			    if (equalClasses(prev, tempRoot.firstChild) && equalTags(prev, tempRoot.firstChild)) {
-				    prev.innerHTML = prev.innerHTML + tempRoot.firstChild.innerHTML;
-					tempRoot.removeChild(tempRoot.firstChild);
-				} else if (tempRoot.firstChild.innerHTML === "") {
-				    tempRoot.removeChild(tempRoot.firstChild);
-				} else {
-				    prev = tempRoot.firstChild;
-				    root.appendChild(prev);
-				}
-			}
+			this.cleanTree(this._handle, tempRoot);
 		},
 		
 
         // Starts editing the field (to be called once detected)
-        startEditing : function () {
+        startEditing : function (optMouseEvent) {
+		   var _target, _tname;
+		   if (optMouseEvent && this.editInProgress==false) {
+			  _target = xtdom.getEventTarget(optMouseEvent);
+			  _tname = xtdom.getLocalName(_target);
+			  if (_tname.toUpperCase() === 'A') { // clicked on a link
+				xtdom.preventDefault(optMouseEvent);
+				xtdom.stopPropagation(optMouseEvent); // prevents link opening
+				var _popupdevice = _getPopupDevice(this.getDocument());
+				this._url = _target.getAttribute('href'); // stores the url to follow
+				if ((!this._url) || (this._url == '')) {
+				  this._url = _target.getAttribute('HREF');
+				}
+				_popupdevice.startEditing(this, ['edit', 'open'], 'edit', _target);
+			  } else {
+			     this.__open__editor();
+			  }
+		   } 
+		   
+		}, 
+		   
+		__open__editor : function () {
           if (this.editInProgress === false) {
             this.editInProgress = true;
 			registerEditor(this);
@@ -774,6 +863,15 @@
             xtdom.addEventListener(this._handle, 'blur', this.blurHandler, false);
           }
         },
+		
+      onMenuSelection: function onMenuSelection (aSelection) {
+        if (aSelection == 'edit') {
+          this.__open__editor();
+        } else if (aSelection == 'open') {
+          // opens this.cachedURL in an external window
+          window.open(this._url);
+        }
+      },
 
         // Stops the edition process on the device
         stopEditing : function (isCancel) {
@@ -799,13 +897,15 @@
             this.stopInProgress = false;
             this.editInProgress = false;
              
-			try {
 			 _currentInstance._handle.parentNode.removeChild(_buttons);
-			 _currentInstance.stopEditing(false);
-			 
-			} catch (e) {alert(e)}
+			 //_currentInstance.stopEditing(false);
 
           }
+		  
+		  if (/^\s*$/.test(innerText(this._handle))) {
+		      this._setData(this.getDefaultData());
+		  }
+		  
         },
 
         // Updates the editor data model with the given data
