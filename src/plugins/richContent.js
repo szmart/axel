@@ -293,7 +293,6 @@
 	    return richStyle.replace(/_/g, ' ');
 	}
 	
-	
 	function inheritClass(node, tag) {
 		if (hasClass(node, tag)) {
 			return true;
@@ -549,8 +548,7 @@
 		  buttons.toggleButton = toggleButton;
 		  
 		  xtdom.addEventListener(toggleButton, 'click', function () {closeButtons();}, false); 
-		  
-		  
+
 		  container.appendChild(buttons);
 		  container.appendChild(toggleButton);
 
@@ -769,17 +767,15 @@
 				} else {
 					prev = current.firstChild;
 					target.appendChild(prev);
-					var _this = this;
-					xtdom.addEventListener(prev, 'click', function(ev) {  _this.startEditing(ev); }, true);
+					//xtdom.addEventListener(prev, 'click', function(ev) {  _this.startEditing(ev); }, true);
 				}
 			}
 			this.setListeners();
 		},
 		
-        recreateTree : function (root, mainTag, allTagged, inherit, style) {
+        recreateTree : function (root, mainTag, allTagged, inherit, style, link) {
 		
 			var tempRoot = xtdom.createElement(this.getDocument(), 'span');	
-			alert(root.outerHTML)
 			while (root.firstChild) {
 				if (root.firstChild.firstChild) {
 					while (root.firstChild.firstChild) {
@@ -794,21 +790,17 @@
 							newFrag.appendChild(root.firstChild.firstChild);
 							tempRoot.appendChild(newFrag);
 						} else {
-							if (mainTag === 'a' || href) {
-								var cur = xtdom.createElement(this.getDocument(), 'a'); // xtdom...
-								cur.innerHTML = root.firstChild.firstChild.innerHTML;
+							if (mainTag === 'a' || (href && link)) {
+								var cur = xtdom.createElement(this.getDocument(), 'a'); // xtdom...								
 								cur.setAttribute('href', href);
-								addClass(cur, root.firstChild.className);
-								addClass(cur, root.firstChild.firstChild.className);
-								root.firstChild.removeChild(root.firstChild.firstChild);
 							} else {
 								var cur = xtdom.createElement(this.getDocument(), 'span'); // xtdom...
-								cur.innerHTML = root.firstChild.firstChild.innerHTML;
-								addClass(cur, root.firstChild.className);
-								addClass(cur, root.firstChild.firstChild.className);
-								root.firstChild.removeChild(root.firstChild.firstChild);
 							}
-							
+							cur.innerHTML = root.firstChild.firstChild.innerHTML;
+						    addClass(cur, root.firstChild.className);
+							addClass(cur, root.firstChild.firstChild.className);
+							root.firstChild.removeChild(root.firstChild.firstChild);
+								
 							if (!allTagged && !inherit) {
 								addClass(cur, style);
 							} else {
@@ -822,7 +814,6 @@
 					tempRoot.appendChild(root.firstChild);
 				} 
 			}
-			alert(tempRoot.outerHTML)
 			return tempRoot;
 		},
 		
@@ -877,7 +868,11 @@
 			    return;
 			}
 			
-			var mainTag = 'a';
+			if (link) {
+			    var mainTag = 'a';
+			} else {
+			    var mainTag = 'span';
+			}
 			
             var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
 			var newNode = xtdom.createElement(this.getDocument(), mainTag);
@@ -887,13 +882,16 @@
 			
 			var root = this._handle;
 
-			newNode.setAttribute('href', url);	
+			if (link) {
+			    var mainTag = 'a';
+				newNode.setAttribute('href', url);	
+			}			
 			
 			var style = "";
 			var allTagged = false;
 			var inherit = false;
 			
-			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style);
+			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, link);
 			
 			this._handle.innerHTML = "";
 			
@@ -927,11 +925,10 @@
 			var allTagged = false;
 			var inherit = false;
 			var style = "";
-			var url = "";
 			
 		    removeAllClasses(newNode);
 			
-			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, url);
+			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style,true);
 			
 			this._handle.innerHTML = "";
 			
@@ -969,9 +966,8 @@
 			    var mainTag = 'span';
 			}
 			
-			var url = "";
 			
-			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, url);
+			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, true);
 			
 			this._handle.innerHTML = "";
 			
