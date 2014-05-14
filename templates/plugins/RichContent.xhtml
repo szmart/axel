@@ -11,7 +11,7 @@
 
     <style type="text/css">
       .axel-core-editable[contenteditable] {
-        boutline: thin dashed #bbffdd;
+        aboutline: thin dashed #bbffdd;
       }
       .multi {
         -moz-column-count: 2;
@@ -25,104 +25,20 @@
         color: brown;
       }
 	  
-	.bold {
-		font-weight: bold;
-	}
-			
-	.italics {
-		font-style:italic;
-	}
-			
-	.underline {
-		text-decoration: underline;
-	}
-	
-	.line-through {
-		text-decoration: line-through;
-	}
-
-	.overline {
-		text-decoration: overline;
-	}
-		
-	.box {
-		padding:10px;
-		border-style:solid;
-		border-width:1px;
-		border-color:#D4D4D4;
-	}
-				
-	.button-as-links {
-		background-color: #DFDFD0;
-		color: black; 
-		padding: 2px 4px 2px 4px;
-		margin: 1px 3px 1px 3px; 
-        -moz-border-radius: 5px;
-        border-radius: 5px;
-		font-size: 10pt;
-		border: 0;
-		box-shadow: 2px 2px 1px #888888;
-	}
-	
-	.url-box {
-	    width: 300px; 
-	    height: 10pt; 
-		font-size: 9pt;
-		margin: 8pt 3px 0px 3px; 
-	}
-	
-	.edit-button {
-		background-color: #DFDFD0;
-		color: black; 
-        -moz-border-radius: 5px;
-        border-radius: 5px;
-		border: 0;
-		margin-top: 10px;
-		padding: 2px 4px 2px 4px;
-		font-size: 10pt;
-		box-shadow: 2px 2px 1px #888888;
-		-moz-box-shadow: 2px 2px 1px #888888;
-		-webkit-box-shadow: 2px 2px 1px #888888;
-	}
-	
-	
-	.modal {
-		display: none;
-	    background-color: #DFDFD0;
-	    padding: 30px;
-	    border: 1px solid black;
-        -moz-border-radius: 5px;
-        border-radius: 5px;
-	    float: left;
-	    font-size: 12pt;
-	    z-index: 99999;
-		box-shadow: 2px 2px 1px #888888;
-		-moz-box-shadow: 2px 2px 1px #888888;
-		-webkit-box-shadow: 2px 2px 1px #888888;
-	}
-	
-	
-	.buttons-container {
-		padding:20px; 
-		position: fixed; 
-		top: 30px; 
-		right: 20px;
-	    background-color: #F0F0F0;
-	    border: 1px solid black;
-        -moz-border-radius: 5px;
-        border-radius: 5px;
-	    z-index: 99999;
-		box-shadow: 2px 2px 1px #888888;
-		-moz-box-shadow: 2px 2px 1px #888888;
-		-webkit-box-shadow: 2px 2px 1px #888888;
-	}
 
     </style>
 
     <!-- template enrichment : extracts and generates xt:attribute and xt:use sample code -->
     <link rel="stylesheet" type="text/css" href="../shared/demo.css" />
     <script type="text/javascript" src="../../3rd-part/jquery/js/jquery-1.7.1.min.js"></script>
-    <script type="text/javascript" src="../shared/demo.js">//</script>
+    <script type="text/javascript" src="../shared/demo.js"></script>
+	<link rel="stylesheet" href="../../axel/bundles/richcontent/richcontent.css" type="text/css"></link>
+	<!--
+
+	<script src="../../axel/bundles/richcontent/richcontentparams.js" type="text/javascript"></script>
+	
+	-->
+	
   </head>
   <body>
 
@@ -135,27 +51,77 @@
 
     <ul class="parameters">
       <li><var>noedit</var> (<code>true|<b>false</b></code>) : set it  to <code>true</code> to make the field read only (constant).</li>
-      <li><var>class</var> (<code><i>name</i></code>) : set a class name on the handle</li>
+      <li><var>class</var> (<code><i>name</i></code>) : set a class name on the handle.</li>
+	  <li><var>lang</var> (<code><i>name</i></code>) : set the input/output format (default is `fragment').</li>
+	  <li><var>multilines</var> (<code><i>normal|none</i></code>) : allows for line breaks in the editable content.</li>
     </ul>
 
     <h2>Default configuration</h2>
+	
+	
+	<p>The default configuration accepts an input composed of a list of <code>Fragments</code> and <code>Links</code>. <code>Fragments</code> contain a single text node, <code>Links</code> are parents to a <code>LinkRef</code> and a <code>LinkText</code>. The <code>Fragments</code> and <code>LinkTexts</code> can optionally bear a <code>RichStyle</code> attribute.</p>
 
     <div class="demo extract">
-        <p><xt:use types="richContent" label="parag" ><span>The Gallic Empire (Latin: </span><span class="bold">Imperium Galliarum</span><span>) is the modern name for a breakaway part of the Roman Empire that functioned </span><span class="italics">de facto</span><span> as a separate state from 260 to 274. It originated during the Crisis of the Third Century. It was </span><a href="http://www.libe.fr">established</a><span> by Postumus in 260  </span><span class="italics underline">in the wake of barbarian</span><span> invasions and instability in Rome, and at its height included the territories of Germania, Gaul, Britannia, and (for a time) Hispania. After Postumus' assassination in 268 it lost much of its territory, but continued under a number of emperors and usurpers. It was retaken by Roman emperor Aurelian after the Battle of Châlons in 274.</span></xt:use><xt:menu-marker/></p>
+        <p contenteditable="true" id="test"><xt:use types="richContent" label="parag" ><Fragment>The Gallic Empire (Latin: </Fragment><Fragment RichStyle="bold">Imperium Galliarum</Fragment><Fragment>) is the modern name for a breakaway part of the Roman Empire that functioned </Fragment><Fragment RichStyle="italics">de facto</Fragment><Fragment> as a separate state from 260 to 274. It originated during the Crisis of the Third Century. It was </Fragment><Link><LinkRef> http://www.libe.fr</LinkRef><LinkText>established</LinkText></Link><Fragment> by Postumus in 260  </Fragment><Fragment RichStyle="italics underline">in the wake of barbarian</Fragment><Fragment> invasions and instability in Rome, and at its height included the territories of Germania, Gaul, Britannia, and (for a time) Hispania. After Postumus' assassination in 268 it lost much of its territory, but continued under a number of emperors and usurpers. It was retaken by Roman emperor Aurelian after the Battle of Châlons in 274.</Fragment></xt:use><xt:menu-marker/></p>
+    </div>
+	
+    <h2>With spans</h2>
+
+	<p>The `span' configuration accepts an input composed of a list of HTML <code>spans</code> and <code>a</code> nodes. <code>spans</code> and <code>as</code> contain a single text node, and can possess a <code>RichStyle</code> attribute.</p>
+
+    <div class="demo extract">
+        <p><xt:use types="richContent" label="parag" param="lang=span"><span>The Gallic Empire (Latin: </span><span class="bold">Imperium Galliarum</span><span>) is the modern name for a breakaway part of the Roman Empire that functioned </span><span class="italics">de facto</span><span> as a separate state from 260 to 274. It originated during the Crisis of the Third Century. It was </span><a href="http://www.libe.fr">established</a><span> by Postumus in 260  </span><span class="italics underline">in the wake of barbarian</span><span> invasions and instability in Rome, and at its height included the territories of Germania, Gaul, Britannia, and (for a time) Hispania. After Postumus' </span><a href="http://www.lemonde.fr">assassination</a><span> in 268 it lost much of its territory, but continued under a number of emperors and usurpers. It was retaken by Roman emperor Aurelian after the Battle of Châlons in 274.</span></xt:use><xt:menu-marker/></p>
     </div>
 	
 
-    <h2>Styled with a class name</h2>
+    <h2>With multilines</h2>
+	
+	<p>The `multilines' configuration will display the line breaks appearing in the content.</p>
 
     <div class="demo extract">
-      <p><xt:use types="richContent" label="Styled" param="class=styled"><span>The Gallic Empire (Latin: </span><span class="bold">Imperium Galliarum</span><span>) is the modern name for a breakaway part of the Roman Empire that functioned </span><span class="italics">de facto</span><span> as a separate state from 260 to 274. It originated during the Crisis of the Third Century. It was </span><a href="http://www.libe.fr">established</a><span> by Postumus in 260  </span><span class="italics underline">in the wake of barbarian</span><span> invasions and instability in Rome, and at its height included the territories of Germania, Gaul, Britannia, and (for a time) Hispania. After Postumus' assassination in 268 it lost much of its territory, but continued under a number of emperors and usurpers. It was retaken by Roman emperor Aurelian after the Battle of Châlons in 274.</span></xt:use></p>
-    </div>
-    
-    <h2>With multi-column text (using CSS)</h2>
+        <p><xt:use types="richContent" label="parag" param="multilines=normal">
+<Fragment RichStyle="bold">JABBERWOCKY
+</Fragment>
+<Fragment>
+by: </Fragment><Fragment RichStyle="italics">Lewis Carroll (1832-1898)
+</Fragment>
+<Fragment>
+'TWAS brillig, and the slithy toves
+Did gyre and gimble in the wabe:
+All mimsy were the borogoves,
+And the mome raths outgrabe.
+ 
+"Beware the Jabberwock, my son!
+The jaws that bite, the claws that catch!
+Beware the jubjub bird, and shun
+The frumious Bandersnatch!"
+ 
+He took his vorpal sword in hand:
+Long time the manxome foe he sought--
+So rested he by the Tumtum tree,
+And stood awhile in thought.
+ 
+And, as in uffish thought he stood,
+The Jabberwock, with eyes of flame,
+Came whiffling through the tulgey wood,
+And burbled as it came!
+ 
+One, two! One, two! And through and through
+The vorpal blade went snicker-snack!
+He left it dead, and with its head
+He went galumphing back.
+ 
+"And hast thou slain the Jabberwock?
+Come to my arms, my beamish boy!
+O frabjous day! Calloh! Callay!"
+He chortled in his joy.
+ 
+'Twas brillig, and the slithy toves
+Did gyre and gimble in the wabe:
+All mimsy were the borogoves,
+And the mome raths outgrabe.</Fragment>
 
-    <div class="demo extract">
-      <p class="multi"><xt:use types="richContent" label="MultiColumn"><span>The Gallic Empire (Latin: </span><span class="bold">Imperium Galliarum</span><span>) is the modern name for a breakaway part of the Roman Empire that functioned </span><span class="italics">de facto</span><span> as a separate state from 260 to 274. It originated during the Crisis of the Third Century. It was </span><a href="http://www.libe.fr">established</a><span> by Postumus in 260  </span><span class="italics underline">in the wake of barbarian</span><span> invasions and instability in Rome, and at its height included the territories of Germania, Gaul, Britannia, and (for a time) Hispania. After Postumus' assassination in 268 it lost much of its territory, but continued under a number of emperors and usurpers. It was retaken by Roman emperor Aurelian after the Battle of Châlons in 274.</span></xt:use></p>
+</xt:use><xt:menu-marker/></p>
     </div>
-    
   </body>
 </html>

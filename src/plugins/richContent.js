@@ -14,20 +14,25 @@
 
 (function ($axel) {
 
+  var handleTag = 'span'; //default is span
+
   var _Generator = function ( aContainer, aXTUse, aDocument ) {
-    var htag = aXTUse.getAttribute('handle') || 'span';
-    var h = xtdom.createElement(aDocument, htag);
+    var params = aXTUse.getAttribute('param');
+	var paramDict = {};
+	xtiger.util.decodeParameters(params, paramDict);
+	var defaultTag = paramDict['multilines'] === 'normal' ? 'pre' : 'span';
+    handleTag = aXTUse.getAttribute('handle') || defaultTag;
+    var handle = xtdom.createElement(aDocument, handleTag);
     var t = xtdom.createTextNode(aDocument, '');
-    h.appendChild(t);
-    xtdom.addClassName(h, 'axel-core-on');
-    aContainer.appendChild(h);
-    return h;
+    handle.appendChild(t);
+    xtdom.addClassName(handle, 'axel-core-on');
+	var span = xtdom.createElement(aDocument, 'span');
+    aContainer.appendChild(handle);
+    return handle;
   };
 
   // Uses a closure to store class level private utility properties and functions
   var _Editor = (function () {
-  
-    xtdom.extractDefaultContentXT = extractDefaultContentXT;
 	
 	var urlPattern = new RegExp(/[-a-zA-Z0-9@:%_\+.~#?&//=]{2,}\.[a-z]{2,}\b(\/[-a-zA-Z0-9@:%_\+.~#?&//=]*)?/gi);
 
@@ -41,6 +46,18 @@
 		{name : 'Strike', style : 'line-through'}
 	];
 	
+	var dataConfigS = {
+	    spans : {
+	        link : {tag : 'a', ref : 'href', style : 'class'},
+		    standard : {tag : 'span', style : 'class'}
+	    },
+	    fragments : {
+	        link : {tag : 'Link', ref : {tag : 'LinkRef'}, text : {tag : 'LinkText', style : 'RichStyle'}},
+		    standard : {tag : 'Fragment', style : 'RichStyle'}
+	    }
+    }	
+	
+
 	function _formats() {
 	    var ret = []
 	    for (var i = 0; i < formatsAndCSS.length; i++) {
@@ -51,18 +68,20 @@
 	
 	var allowedCSS = _formats();
 	
-	var dataConfigS = {
-	    spans : {
-	        link : {tag: 'a', ref : 'href', style: 'class'},
-		    standard : {tag: 'span', style: 'class'}
-	    },
-	    fragments : {
-	        link : {tag: 'Link', ref : 'Ref', style: 'RichStyle'},
-		    standard : {tag: 'Fragment', style: 'RichStyle'}
-	    }
-    }		
-	
-	dataConfig = dataConfigS['spans'];
+	function allowedStyle(style) {
+	    if (!style) {
+		    return null;
+		}
+
+	    var splits = style.split(/ /);
+		var ret = [];
+		for (var i = 0; i < splits.length; i++) {
+		    if (allowedCSS.indexOf(splits[i]) !== -1) {
+			    ret.push(splits[i]);
+			}
+		}
+		return ret.join(' ');
+	}	
 	
 	var _getPopupDevice = function (aDocument) {
 	   var devKey = 'popupdevice';
@@ -74,23 +93,6 @@
 	   return device;
     };
 
-    function _focusAndSelect ( editor ) {
-      // pre-condition: the editor's handle must already have focus
-      try {
-        editor.getDocument().execCommand('selectAll', false, ''); // FIXME: fails on iPad
-      }
-      catch (e) { }
-    }
-
-    // Checks node contains only a text node, otherwise recreate it
-    // (this can be used to prevent cut and paste side effects)
-    function _sanitize (pasteHTML, doc) {
-	  var span = xtdom.createElement(doc, 'span');
-	  span.innerHTML = pasteHTML;
-      return innerText(span);
-	  
-    }
-	
 	function innerText(node) {
 	    if (node.nodeType == xtdom.TEXT_NODE) {
 		    return node.textContent;
@@ -104,21 +106,17 @@
 		    return ""
 		}
 	}
-	
-	/*
-	  Extracts the content of an XTiger node. We need a function different from the default
-	  xtdom.extractDefaultContentXT() because the latter only extracts text content (by 
-	  concatenating the inner HTML of possible subnodes). Any formatting information is lost in 
-	  the process. Our method keeps the CSS formatting of span subnodes mentionned in formatsAndCSS.
-	*/
-	function extractDefaultContentXT(node) {
+		
+	function extractFragmentContentXT(node) {
+
+	    var dataConfig = dataConfigS.fragments;
 	    if (xtiger.ATTRIBUTE == xtdom.getNodeTypeXT(node)) {
 		    var dump = node.getAttribute('default');
 		    if (dump && (-1 === dump.search(/\S/)))  {
 		        return null;
 		    }
         }
-	  
+
 	  if (node.childNodes) {
 	    var root = document.createElement('span');
 		var cur;
@@ -126,25 +124,82 @@
 		    cur = node.firstChild;
 			if (cur.nodeType === xtdom.ELEMENT_NODE && cur.tagName === dataConfig.standard.tag) {
 			    var span = document.createElement('span');
-				span.innerHTML = innerText(node.firstChild);
-				var style = cur.getAttribute(dataConfig.standard.style);
-				if (style && allowedCSS.indexOf(style) !== -1) {
+				span.innerHTML = innerText(cur);
+				var style = allowedStyle(cur.getAttribute(dataConfig.standard.style));
+				if (style) {
 				    span.setAttribute('class', style);
 				}
-				node.removeChild(node.firstChild);
+				node.removeChild(cur);
+				root.appendChild(span);			
+			} else 	if (cur.nodeType === xtdom.ELEMENT_NODE && cur.tagName === dataConfig.link.tag) {
+			    var a = document.createElement('a');
+				while (cur.firstChild) {
+					if (cur.firstChild.tagName === dataConfig.link.ref.tag) {
+						a.setAttribute('href', cur.firstChild.innerHTML);
+				    } else if (cur.firstChild.tagName === dataConfig.link.text.tag) {
+						a.innerHTML = cur.firstChild.innerHTML;
+				        var style = allowedStyle(cur.firstChild.getAttribute(dataConfig.link.text.style));
+				        if (style) {
+				            a.setAttribute('class', style);
+				        }
+				    }
+				    cur.removeChild(cur.firstChild);
+                }	
+				root.appendChild(a);	
+				node.removeChild(cur);				
+			} else {
+			    node.removeChild(cur);
+			}
+		}
+	  } else {
+	    var root = document.createElement('span');
+		root.innerHTML = innerText(node);
+	  }
+
+	  return root;
+	}
+	
+	/*
+	  Extracts the content of an XTiger node. We need a function different from the default
+	  xtdom.extractDefaultContentXT() because the latter only extracts text content (by 
+	  concatenating the inner HTML of possible subnodes). Any formatting information is lost in 
+	  the process. Our method keeps the CSS formatting of span subnodes mentionned in formatsAndCSS.
+	*/
+	function extractSpanContentXT(node) {
+	    var dataConfig = dataConfigS.spans;
+	    if (xtiger.ATTRIBUTE == xtdom.getNodeTypeXT(node)) {
+		    var dump = node.getAttribute('default');
+		    if (dump && (-1 === dump.search(/\S/)))  {
+		        return null;
+		    }
+        }
+
+	  if (node.childNodes) {
+	    var root = document.createElement('span');
+		var cur;
+		while (node.firstChild) {
+		    cur = node.firstChild;
+			if (cur.nodeType === xtdom.ELEMENT_NODE && cur.tagName === dataConfig.standard.tag) {
+			    var span = document.createElement('span');
+				span.innerHTML = innerText(cur);
+				var style = allowedStyle(cur.getAttribute(dataConfig.standard.style));
+				if (style) {
+				    span.setAttribute('class', style);
+				}
+				node.removeChild(cur);
 				root.appendChild(span);			
 			} else 	if (cur.nodeType === xtdom.ELEMENT_NODE && cur.tagName === dataConfig.link.tag) {
 			    var a = document.createElement('a');
 				a.setAttribute('href', cur.getAttribute(dataConfig.link.ref));
-				a.innerHTML = innerText(node.firstChild);
-				var style = cur.getAttribute(dataConfig.link.style);
-				if (style && allowedCSS.indexOf(style) !== -1) {
+			    a.innerHTML = innerText(cur);
+				var style = allowedStyle(cur.getAttribute(dataConfig.standard.style));
+				if (style) {
 				    a.setAttribute('class', style);
 				}
-				node.removeChild(node.firstChild);
+				node.removeChild(cur);
 				root.appendChild(a);			
 			} else {
-			    node.removeChild(node.firstChild);
+			    node.removeChild(cur);
 			}
 		}
 	  } else {
@@ -153,6 +208,11 @@
 	  }
 	  
 	  return root;
+	}
+	
+	
+	xtdom.extractDefaultContentXT = function (node) {
+	    return node;
 	}
 
 	
@@ -171,23 +231,50 @@
 	    return className.replace(/\s+/g, '_');
 	}
 	
-	function logSpansToFragments(root, logger) {
+	function logToSpans(root, logger) {
+	    var dataConfig = dataConfigS.spans;
 		for (var i = 0; i < root.childNodes.length; i++) {
 			if (root.childNodes[i].tagName === 'a' && root.childNodes[i].href) {
 			    logger.openTag(dataConfig.link.tag);
-				//logger.openTag('LinkText');
 			    if (root.childNodes[i].className) {
 			        logger.openAttribute(dataConfig.link.style);
 			        logger.write(classToFragStyle(root.childNodes[i].className));
 				    logger.closeAttribute(dataConfig.link.style);
 				}
-				//logger.closeTag('LinkText');
-				//logger.openTag('LinkRef');
 				logger.openAttribute(dataConfig.link.ref);
 				logger.write(root.childNodes[i].href);
-				//logger.closeTag('LinkRef');
 				logger.closeAttribute(dataConfig.link.ref);
 				logger.write(root.childNodes[i].textContent);
+			    logger.closeTag(dataConfig.link.tag);			    
+			} else if (root.childNodes[i].tagName === 'span') {
+			    logger.openTag(dataConfig.standard.tag);
+			    if (root.childNodes[i].className) {
+			        logger.openAttribute(dataConfig.standard.style);
+			        logger.write(classToFragStyle(root.childNodes[i].className));
+				    logger.closeAttribute(dataConfig.standard.style);
+				}
+				logger.write(root.childNodes[i].textContent);
+				logger.closeTag(dataConfig.standard.tag);
+			}
+		}
+	}
+	
+	function logToFragments(root, logger) {
+	    var dataConfig = dataConfigS.fragments;
+		for (var i = 0; i < root.childNodes.length; i++) {
+			if (root.childNodes[i].tagName === 'a' && root.childNodes[i].href) {
+			    logger.openTag(dataConfig.link.tag);
+				logger.openTag(dataConfig.link.text.tag);
+			    if (root.childNodes[i].className) {
+			        logger.openAttribute(dataConfig.link.style);
+			        logger.write(classToFragStyle(root.childNodes[i].className));
+				    logger.closeAttribute(dataConfig.link.style);
+				}
+				logger.write(root.childNodes[i].textContent);
+				logger.closeTag(dataConfig.link.text.tag);
+				logger.openTag(dataConfig.link.ref.tag);
+				logger.write(root.childNodes[i].href);
+				logger.closeTag(dataConfig.link.ref.tag);
 			    logger.closeTag(dataConfig.link.tag);			    
 			} else if (root.childNodes[i].tagName === 'span') {
 			    logger.openTag(dataConfig.standard.tag);
@@ -206,22 +293,6 @@
 	    return richStyle.replace(/_/g, ' ');
 	}
 	
-	function fragsToSpans(frags, doc) { // we should try to take into account ill-formed fragments...
-	    var root = xtdom.createElement(doc, 'span');
-		for (var i = 0; i < frags.childNodes.length; i++) {
-		    if (frags.childNodes[i].nodeType === Node.ELEMENT_NODE && frags.childNodes[i].tagName.toLowerCase() == 'fragment')  {
-			    var span = xtdom.createElement(doc, 'span');
-				if (frags.childNodes[i].getAttribute('RichStyle')) {
-				    var style = frags.childNodes[i].getAttribute('RichStyle');
-				    xtdom.addClassName(span, fragStyleToClass(style));
-				}
-				var text = xtdom.createTextNode(doc, frags.childNodes[i].textContent);
-				span.appendChild(text);
-				root.appendChild(span);
-		    } 
-		}
-		return root;
-	}
 	
 	function inheritClass(node, tag) {
 		if (hasClass(node, tag)) {
@@ -305,10 +376,23 @@
 		}
 	}
 	
-	function toggleButtons() {
-	    if (_currentInstance.editInProgress) {
+	function removeAllClasses(node) {
+	    if (node.nodeType === xtdom.TEXT_NODE) {
+		    return;
+		} 
+		node.removeAttribute('class');
+		for (var i = 0; i < node.childNodes.length; i++) {
+		    removeAllClasses(node.childNodes[i]);
+		}
+	}
+	
+	function closeButtons() {
+	    if (_currentInstance) {
 			_currentInstance._handle.parentNode.removeChild(_buttons);
 			_currentInstance.stopEditing(false);
+			_buttons.linkArea.value = 'http://...';
+		    _currentInstance.currentLink = null;
+			_currentInstance._url = null;
 	    } 
 	}
 	
@@ -325,7 +409,7 @@
 	function showModal(instance, text) {
 	    _modal.textContent = text;
 		_modal.style.display = 'block';
-		xtdom.setAttribute(instance._handle, 'contenteditable', 'false');
+		setEditable(instance, 'false')
 		instance._handle.appendChild(_modal);
 		var width = _modal.style.width;
 		var height = _modal.style.height;
@@ -339,7 +423,7 @@
 		xtdom.addEventListener(_modal, 'click', 
 		    function(ev) {
 			    _modal.style.display='none';
-				xtdom.setAttribute(instance._handle, 'contenteditable', 'true');
+				setEditable(instance, 'true');
 			});
 	}
 	
@@ -350,29 +434,42 @@
 	
 	function registerEditor(instance) {
 	    _currentInstance = instance;
-		_buttons.linkArea.value = 'http://...';
-		_currentInstance._handle.parentNode.appendChild(_buttons);
+		//_buttons.linkArea.value = 'http://...';
+		instance.buttons = _buttons;
+		instance._handle.parentNode.appendChild(_buttons);
+	}
+	
+	function setEditable(instance, value) {
+	    xtdom.setAttribute(instance._handle, 'contenteditable', value);
+		// For some reason, the paste works only occasionally when the parent node is not
+		// set to be content editable.
+		xtdom.setAttribute(instance._handle.parentNode, 'contenteditable', value);
 	}
 	
 	function createButtons() {
-		
+
 		  var container = document.createElement('div');//xtdom.createElement(instance.getDocument(), 'span');
-		  /*container.setAttribute('draggable', 'true');
+		   
+		  /*try {
+		  container.setAttribute('draggable', 'true');
 		  function dragStart(ev) {
 		      container.offsetX = parseInt(ev.clientX) - container.style.left;
 			  container.offsetY = parseInt(ev.clientY) - container.style.top;
-			  ev.dataTransfer.effectsAllowed = "copy";
-			  ev.dataTransfer.setData('text/html', this.innerHTML);
+			  ev.dataTransfer.effectsAllowed = "move";
+			  ev.dataTransfer.setData('text', "");
 			  console.log('start')
+			  //console.log(document.outerHTML);
 		  }
 		  
-		  function dragover(ev) {
-		      console.log('over')
+		  function dragEnd(ev) {
+		      console.log('stop')
 			  //container.innerHTML = "<span>drop</span>"
 		      try {
               //ev.stopPropagation();
-		      //container.style.right = parseInt(ev.clientX) - container.offsetX;
-			  //container.style.top = parseInt(ev.clientY) - container.offsetY;
+			  alert(parseInt(ev.clientX) - container.offsetX)
+		      container.style.left = (parseInt(ev.clientX) - container.offsetX) + 'px';
+			  container.style.top = (parseInt(ev.clientY) - container.offsetY) + 'px';
+			  alert(container.style.left)
 			  } catch (e) {console.log(e)}
           }
 		  
@@ -380,11 +477,15 @@
 			  console.log('drop')
 			  
           }
-		  xtdom.addEventListener(container, 'dragstart', function (ev) {dragStart(ev);return false;}, false);
-		  xtdom.addEventListener(container, 'dragover', function (ev) {dragover(ev);}, false);
-		  xtdom.addEventListener(container, 'drop', function(ev) {drop(ev);}, false);
-		  */
-		
+		  
+		  //alert(document.outerHTML);
+		  
+		  xtdom.addEventListener(container, 'dragstart', function (ev) {dragStart(ev); return false;}, false);
+		  xtdom.addEventListener(container, 'dragend', function (ev) {dragEnd(ev)}, false);
+		  xtdom.addEventListener(document, 'drop', function(ev) {drop(ev);}, false);
+		  
+		} catch (e) {alert(e)}
+		*/
 		  var buttons = document.createElement('span');//xtdom.createElement(instance.getDocument(), 'span');
 
 		  //buttons.setAttribute('style', 'display:none; padding-top:20px;');
@@ -410,10 +511,20 @@
               xtdom.addEventListener(button, 'click', callToEnrich(style), false);  
 		  }
 		  
+		  var clearButton = document.createElement('button');//xtdom.createElement(instance.getDocument(), 'button');
+		  clearButton.setAttribute('class', 'button-as-links');
+		  var inner = document.createElement('span'); //xtdom.createElement(instance.getDocument(), 'span');
+		  inner.textContent = 'Clear';
+		  clearButton.appendChild(inner);
+		  buttons.appendChild(clearButton);	
+          xtdom.addEventListener(clearButton, 'click', function() {_currentInstance.clearRange()}, false); 
 
 		  var linkArea = document.createElement('textarea'); //xtdom.createElement(instance.getDocument(), 'textarea');
 		  linkArea.setAttribute('class', 'url-box');
 		  container.linkArea = linkArea;
+		  
+		  xtdom.addEventListener(linkArea, 'change', function () {_currentInstance.changeLink(linkArea, this); return false}, false);
+		  
 		  var makeLinkButton = document.createElement('span'); //xtdom.createElement(instance.getDocument(), 'span');
 		  var innerLinkButton = document.createElement('button'); //xtdom.createElement(instance.getDocument(), 'button');
 		  innerLinkButton.setAttribute('class', 'button-as-links');
@@ -437,12 +548,12 @@
 		  toggleButton.textContent = 'Close';
 		  buttons.toggleButton = toggleButton;
 		  
-		  xtdom.addEventListener(toggleButton, 'click', function () {_currentInstance.stopEditing(false);}, false); 
+		  xtdom.addEventListener(toggleButton, 'click', function () {closeButtons();}, false); 
 		  
 		  
 		  container.appendChild(buttons);
 		  container.appendChild(toggleButton);
-		  
+
 		  return container;
 		}
 
@@ -453,7 +564,12 @@
       ////////////////////////
 
       onInit : function ( aDefaultData, anOptionAttr, aRepeater ) {
-	    var data = normalize(aDefaultData, this.getDocument());
+		if (this.getParam('lang') === 'span') {
+		    var data = extractSpanContentXT(aDefaultData);
+		} else {
+		    var data = extractFragmentContentXT(aDefaultData);
+		}
+	    var data = normalize(data, this.getDocument());
         if (! data) { 
           this._content = '<span>Click to edit</span>'; // should make a function to ensure proper structure of the content
         } else {
@@ -469,23 +585,19 @@
 
       // Awakes the editor to DOM's events, registering the callbacks for them
       onAwake : function () {
-	    xtdom.addClassName(this._handle, 'axel-core-editable');
         var _this = this;
         if (this.getParam('noedit') !== 'true') {
-          xtdom.setAttribute(this._handle, 'contenteditable', 'true');
           xtdom.addClassName(this._handle, 'axel-core-editable');
           // 'mousedown' always preceeds 'focus', saves shiftKey timestamp to detect it in forthcoming 'focus' event
           xtdom.addEventListener(this._handle, 'mousedown', function(ev) { if (ev.shiftKey) { _timestamp = new Date().getTime(); } }, true);
           // tracks 'focus' event in case focus is gained with tab navigation  (no shiftKey)
-		  for (var i = 0; i < this._handle.childNodes.length; i++) {
-              xtdom.addEventListener(this._handle.childNodes[i], 'click', function(ev) {  _this.startEditing(ev); }, true);
-		  }
-          if (xtiger.cross.UA.gecko) {  // gecko: prevent browser from selecting contentEditable parent in triple clicks ! 
+		  this.setListeners();
+          /*if (xtiger.cross.UA.gecko) {  // gecko: prevent browser from selecting contentEditable parent in triple clicks ! 
             xtdom.addEventListener(this._handle, 'mousedown', function(ev) { if (ev.detail >= 3) { xtdom.preventDefault(ev);xtdom.stopPropagation(ev);_this._handle.focus();_focusAndSelect(_this); } }, true);
           }
           if (xtiger.cross.UA.webKit) {
             this.doSelectAllCb = function () { _focusAndSelect(_this); }; // cache function
-          }
+          }*/
           // TODO: instant paste cleanup by tracking 'DOMNodeInserted' and merging each node inserted ?
         }
         this.blurHandler = function (ev) { _this.handleBlur(ev); };
@@ -506,13 +618,16 @@
       },
 
       onSave : function (aLogger) {
+
         if (this.isOptional() && (!this.isSet())) {
           aLogger.discardNodeIfEmpty();
           return;
         }
-        if (this._handle) {
-	      logSpansToFragments(this._handle, aLogger);
-        }
+	    if (this._handle && this.getParam('lang') === 'span') {
+		    logToSpans(this._handle, aLogger);
+		} else {
+		    logToFragments(this._handle, aLogger);
+		}
       },
 
       ////////////////////////////////
@@ -576,16 +691,54 @@
         doKeyUp : function (ev) { 
         },
 		
-		interceptPaste : function (event) {
+		setListeners : function () {
+		    var _this = this;
+		    for (var i = 0; i < this._handle.children.length; i++) {
+		        var child = this._handle.children[i];
+                xtdom.addEventListener(child, 'click', function(ev) {  _this.clickedFrag(ev); return false;}, true);
+			    xtdom.addEventListener(child, 'paste', function(ev) {  _this.interceptPaste(ev, child);}, true);
+		    }
+		},
 		
-			var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
+		interceptPaste : function (event, node) {
+
+			event.preventDefault();
 			
-		    var winText = window.clipboardData ? window.clipboardData.getData("Text") : "";
+			var winText = window.clipboardData ? window.clipboardData.getData("Text") : "";
 			var eventText = event.clipboardData ? event.clipboardData.getData('text') : "";
-			if (eventHTML) {
+			if (eventText) {
 			    var content = eventText;
 			} else {
 				var content = winText;
+			}
+
+			var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
+
+			var newNode = xtdom.createElement(this.getDocument(), 'span');
+			newNode.innerHTML = content;
+
+			range.insertNode(newNode)
+	        
+			var parent = newNode.parentNode;
+			parent.innerHTML = innerText(parent);
+			
+			return false;  
+
+            /*			
+			
+			var winText = window.clipboardData ? window.clipboardData.getData("Text") : "";
+			var eventText = event.clipboardData ? event.clipboardData.getData('text') : "";
+			if (eventText) {
+			    var content = eventText;
+			} else {
+				var content = winText;
+			}
+			
+			try {
+		    var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
+			
+			} catch (e) {
+			    alert(e)
 			}
 
 			var newNode = xtdom.createElement(this.getDocument(), 'span');
@@ -596,7 +749,7 @@
 		    var store = this._handle.innerHTML;
 			this._handle.innerHTML = store;
 			var _this = this;			
-			setTimeout(function() {_this.regularizePaste(store)}, 2);
+			setTimeout(function() {_this.regularizePaste(store)}, 2);*/
 			
 		},
 		
@@ -620,57 +773,97 @@
 					xtdom.addEventListener(prev, 'click', function(ev) {  _this.startEditing(ev); }, true);
 				}
 			}
+			this.setListeners();
 		},
 		
-		regularizePaste : function (store) {
-			
-			var root = xtdom.createElement(this.getDocument(), 'span');
-			root.innerHTML = store;
-			
-			var tempRoot = xtdom.createElement(this.getDocument(), 'span');
+        recreateTree : function (root, mainTag, allTagged, inherit, style, url) {
+		
+			var tempRoot = xtdom.createElement(this.getDocument(), 'span');	
 			
 			while (root.firstChild) {
-			    if (root.firstChild.firstChild) {
-				    while (root.firstChild.firstChild) {
-					    if (root.firstChild.firstChild.nodeType === xtdom.TEXT_NODE) {		
-                            var tag = root.firstChild.tagName;							
-						    var newFrag = xtdom.createElement(this.getDocument(), tag); // xtdom...
-							if (tag === 'a') {
-							    newFrag.setAttribute('href', root.firstChild.href);	
+				if (root.firstChild.firstChild) {
+					while (root.firstChild.firstChild) {
+						var href = inLink(root.firstChild.firstChild);
+						var tag = href ? 'a' : 'span';	
+						if (root.firstChild.firstChild.nodeType === xtdom.TEXT_NODE) {			
+							var newFrag = xtdom.createElement(this.getDocument(), tag); // xtdom...
+							if (href) {
+								newFrag.setAttribute('href', href);
 							}
 							addClass(newFrag, root.firstChild.className);
-							addClass(newFrag, root.firstChild.firstChild.className); // is there any class name in this case ??
 							newFrag.appendChild(root.firstChild.firstChild);
 							tempRoot.appendChild(newFrag);
 						} else {
-						    if (root.firstChild.firstChild.tagName in ['a', 'span']) {								
-								var cur = root.firstChild.firstChild;
-								addClass(cur, root.firstChild.className);
-								addClass(cur, root.firstChild.firstChild.className);
-							} else {
-							    var tag = root.firstChild.tagName;
-							    var cur = xtdom.createElement(this.getDocument(), tag);
+							if (mainTag === 'a' || href) {
+								var cur = xtdom.createElement(this.getDocument(), 'a'); // xtdom...
 								cur.innerHTML = root.firstChild.firstChild.innerHTML;
-								if (tag === 'a') {
-								    cur.setAttribute('href', root.firstChild.href);
-								}
+								cur.setAttribute('href', url);
 								addClass(cur, root.firstChild.className);
 								addClass(cur, root.firstChild.firstChild.className);
-								root.firstChild.removeChild(root.firstChild.firstChild);							    
+								root.firstChild.removeChild(root.firstChild.firstChild);
+							} else {
+								var cur = xtdom.createElement(this.getDocument(), 'span'); // xtdom...
+								cur.innerHTML = root.firstChild.firstChild.innerHTML;
+								addClass(cur, root.firstChild.className);
+								addClass(cur, root.firstChild.firstChild.className);
+								root.firstChild.removeChild(root.firstChild.firstChild);
 							}
-						    tempRoot.appendChild(cur);
+							
+							if (!allTagged && !inherit) {
+								addClass(cur, style);
+							} else {
+								removeClass(cur, style); // is this ever used ??
+								//cur.className = undefined;
+							}
+							tempRoot.appendChild(cur);
 						}
 					}
 				} else {
-				    tempRoot.appendChild(root.firstChild);
+					tempRoot.appendChild(root.firstChild);
 				} 
 			}
+			return tempRoot;
+		},
+		
+		/*regularizePaste : function (node, storedHandle) {
+		    try {
+		    //alert(node.outerHTML)
+			alert(this._handle.parentNode.outerHTML)
+			var text = xtdom.createTextNode(this.getDocument(), innerText(node));
+			while (node.firstChild) {
+			    node.removeChild(node.firstChild);
+			}
+			node.appendChild(text);
+			} catch (e) {alert(e)}
+		
+		    this._handle = storedHandle;
+			
+			//alert(this._handle.outerHTML)
+		    
+
+			var root = xtdom.createTextNode(this.getDocument(), span);
+			root.innerHTML = store;
+			
+			if (inLink(newNode)) {
+			    var mainTag = 'a';
+			} else {
+			    var mainTag = 'span';
+			}
+			
+			var style = "";
+			var allTagged = false;
+			var inherit = false;
+			var url = "";
+			
+			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, "");
 			
 			this._handle.innerHTML = "";
 			
 			this.cleanTree(this._handle, tempRoot);
 			
-	    },
+			alert(this._handle.outerHTML)
+			
+	    },*/
 		
 		makeLink : function (urlNode, link) {
 		    var url = urlNode.value;
@@ -683,74 +876,76 @@
 			    return;
 			}
 			
-			if (link) {
-			    var mainTag = 'a';
-			} else {
-			    var mainTag = 'span';
-			}
             var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
 			var newNode = xtdom.createElement(this.getDocument(), mainTag);
-			if (mainTag === 'a') {
-			    newNode.setAttribute('href', url);	
-			}
 			var content = range.extractContents()
 			newNode.appendChild(content)
 			range.insertNode(newNode)
 			
 			var root = this._handle;
 			
-			var tempRoot = xtdom.createElement(this.getDocument(), 'span');			
-
-			while (root.firstChild) {
-			    if (root.firstChild.firstChild) {
-				    while (root.firstChild.firstChild) {
-					    if (root.firstChild.firstChild.nodeType === xtdom.TEXT_NODE) {		
-                            var tag = root.firstChild.tagName;						
-						    var newFrag = xtdom.createElement(this.getDocument(), tag);
-							if (tag === 'a') {
-							    newFrag.setAttribute('href', url);	
-							}
-							addClass(newFrag, root.firstChild.className);
-							addClass(newFrag, root.firstChild.firstChild.className);
-							newFrag.appendChild(root.firstChild.firstChild);
-							tempRoot.appendChild(newFrag);
-						} else {
-						    if (root.firstChild.firstChild.tagName !== mainTag) {
-							    var cur = xtdom.createElement(this.getDocument(), mainTag);
-								cur.innerHTML = root.firstChild.firstChild.innerHTML;
-								if (root.firstChild.href) {
-								    cur.setAttribute('href', root.firstChild.href);
-								}
-								addClass(cur, root.firstChild.className);
-								addClass(cur, root.firstChild.firstChild.className);
-								root.firstChild.removeChild(root.firstChild.firstChild);
-							} else {
-							    var cur = root.firstChild.firstChild;
-								addClass(cur, root.firstChild.className);
-								addClass(cur, root.firstChild.firstChild.className);
-							}
-						    tempRoot.appendChild(cur);
-						}
-					}
-				} else {
-				    tempRoot.appendChild(root.firstChild);
-				} 
+			if (link) {
+			    var mainTag = 'a';
+			} else {
+			    var mainTag = 'span';
 			}
+			
+			if (mainTag === 'a') {
+			    newNode.setAttribute('href', url);	
+			}
+			
+			var style = "";
+			var allTagged = false;
+			var inherit = false;
+			
+			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, url);
 			
 			this._handle.innerHTML = "";
 			
 			this.cleanTree(this._handle, tempRoot);
 		},
 		
-		/*
-		A normalized tree should be made of a root containing a list of paragraphs, 
-		containing a list of lines, containing a list of fragments or links.
+		changeLink : function (linkArea) {
+		    if (this.currentLink && linkArea.value.match(urlPattern)) {
+			    this.currentLink.href = linkArea.value;
+			}
+		},
 		
-		*/
-		
+		clearRange : function () {
+
+            var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
+
+			var newNode = xtdom.createElement(this.getDocument(), 'span');
+			var content = range.extractContents()
+			newNode.appendChild(content)
+			
+			range.insertNode(newNode);
+
+			var root = this._handle;		
+			
+			if (inLink(newNode)) {
+			    var mainTag = 'a';
+			} else {
+			    var mainTag = 'span';
+			}
+			
+			var allTagged = false;
+			var inherit = false;
+			var style = "";
+			var url = "";
+			
+		    removeAllClasses(newNode);
+			
+			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, url);
+			
+			this._handle.innerHTML = "";
+			
+			this.cleanTree(this._handle, tempRoot);
+		},
 		
 		enrich : function (style) {
 
+		    //alert(this._handle.outerHTML)
             var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
 
 			var newNode = xtdom.createElement(this.getDocument(), 'span');
@@ -771,71 +966,52 @@
 			    var allTagged = true;
 			} else {
 			    var allTagged = false;
-			}					
+			}		
 			
-			var tempRoot = xtdom.createElement(this.getDocument(), 'span');	
-			
-			while (root.firstChild) {
-			    if (root.firstChild.firstChild) {
-				    while (root.firstChild.firstChild) {
-					    if (root.firstChild.firstChild.nodeType === xtdom.TEXT_NODE) {
-						    var href = inLink(root.firstChild);
-						    var tag = href ? 'a' : 'span'; // necesssary ?				
-						    var newFrag = xtdom.createElement(this.getDocument(), tag); // xtdom...
-							if (href) {
-							    newFrag.setAttribute('href', href);
-							}
-							addClass(newFrag, root.firstChild.className);
-							newFrag.appendChild(root.firstChild.firstChild);
-							tempRoot.appendChild(newFrag);
-						} else {
-							var href = inLink(root.firstChild.firstChild);
-							if (href) {
-							    var cur = xtdom.createElement(this.getDocument(), 'a'); // xtdom...
-								cur.innerHTML = root.firstChild.firstChild.innerHTML;
-								cur.setAttribute('href', href);
-								addClass(cur, root.firstChild.className);
-								addClass(cur, root.firstChild.firstChild.className);
-								root.firstChild.removeChild(root.firstChild.firstChild);
-							} else {
-							    var cur = root.firstChild.firstChild;
-								addClass(cur, root.firstChild.className);
-								addClass(cur, root.firstChild.firstChild.className); // try without
-							}
-							if (!allTagged && !inherit) {
-							    addClass(cur, style);
-							} else {
-							    removeClass(cur, style);
-							}
-							tempRoot.appendChild(cur);
-						}
-					}
-				} else {
-				    tempRoot.appendChild(root.firstChild);
-				} 
+			if (inLink(newNode)) {
+			    var mainTag = 'a';
+			} else {
+			    var mainTag = 'span';
 			}
+			
+			var url = "";
+			
+			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, url);
 			
 			this._handle.innerHTML = "";
 			
 			this.cleanTree(this._handle, tempRoot);
+
+		},
+		
+		clickedFrag : function (ev) {
+		    ev.preventDefault();
+			var target = xtdom.getEventTarget(ev);
+			var tag = xtdom.getLocalName(target);
+			if (tag.toUpperCase() === 'A') {
+			    _buttons.linkArea.value = target;
+				this.currentLink = target;
+			} else {
+			    //_buttons.linkArea.value = 'http://...';
+				this.currentLink = null;
+			}
+		    if (ev && this.editInProgress === false) {
+			   this.startEditing(ev);
+			} 
 		},
 		
 
         // Starts editing the field (to be called once detected)
-        startEditing : function (optMouseEvent) {
-		   var _target, _tname;
-		   if (optMouseEvent && this.editInProgress==false) {
-			  _target = xtdom.getEventTarget(optMouseEvent);
-			  _tname = xtdom.getLocalName(_target);
-			  if (_tname.toUpperCase() === 'A') { // clicked on a link
-				xtdom.preventDefault(optMouseEvent);
-				xtdom.stopPropagation(optMouseEvent); // prevents link opening
-				var _popupdevice = _getPopupDevice(this.getDocument());
-				this._url = _target.getAttribute('href'); // stores the url to follow
-				if ((!this._url) || (this._url == '')) {
-				  this._url = _target.getAttribute('HREF');
-				}
-				_popupdevice.startEditing(this, ['edit', 'open'], 'edit', _target);
+        startEditing : function (ev) {
+		   if (ev && this.editInProgress == false) {
+			  var target = xtdom.getEventTarget(ev);
+			  var tag = xtdom.getLocalName(target);
+			  if (tag.toUpperCase() === 'A') { // clicked on a link
+				xtdom.preventDefault(ev);
+				xtdom.stopPropagation(ev); // prevents link opening
+				var popupdevice = _getPopupDevice(this.getDocument());
+				this._url = target.href;
+				popupdevice.startEditing(this, ['edit', 'open'], 'edit', target);
 			  } else {
 			     this.__open__editor();
 			  }
@@ -848,8 +1024,11 @@
             this.editInProgress = true;
 			registerEditor(this);
             // registers to keyboard events
-            this.kbdHandlers = this.keyboard.register(this);
+            this.kbdHandlers = this.keyboard.register(this, this._handle);
             this.keyboard.grab(this, this);
+			if (this.getParam('multilines') == 'normal') {
+                this.keyboard.enableRC(true);
+            }
     //        xtdom.removeClassName(this._handle, 'axel-core-editable');
             /*if ((!this.isModified()) || ((_timestamp !== -1) && ((_timestamp - new Date().getTime()) < 100))) {
               if (xtiger.cross.UA.webKit) {
@@ -881,7 +1060,6 @@
             this.keyboard.unregister(this, this.kbdHandlers);
             this.keyboard.release(this, this);
             xtdom.removeEventListener(this._handle, 'blur', this.blurHandler, false);
-            //_sanitize(this._handle, this.doc);
             if (!isCancel) {
               // user may have deleted all
               // FIXME: we should also normalize in case of a paste that created garbage (like some <br/>)
@@ -896,11 +1074,10 @@
     //        xtdom.addClassName(this._handle, 'axel-core-editable');
             this.stopInProgress = false;
             this.editInProgress = false;
-             
-			 _currentInstance._handle.parentNode.removeChild(_buttons);
-			 //_currentInstance.stopEditing(false);
 
           }
+		  
+		  setEditable(this, 'false')
 		  
 		  if (/^\s*$/.test(innerText(this._handle))) {
 		      this._setData(this.getDefaultData());
@@ -928,7 +1105,7 @@
       }
     };
   }());
-
+   
   $axel.plugin.register(
     'richContent', 
     { filterable: false, optional: true },
