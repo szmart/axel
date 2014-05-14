@@ -776,10 +776,10 @@
 			this.setListeners();
 		},
 		
-        recreateTree : function (root, mainTag, allTagged, inherit, style, url) {
+        recreateTree : function (root, mainTag, allTagged, inherit, style) {
 		
 			var tempRoot = xtdom.createElement(this.getDocument(), 'span');	
-			
+			alert(root.outerHTML)
 			while (root.firstChild) {
 				if (root.firstChild.firstChild) {
 					while (root.firstChild.firstChild) {
@@ -797,7 +797,7 @@
 							if (mainTag === 'a' || href) {
 								var cur = xtdom.createElement(this.getDocument(), 'a'); // xtdom...
 								cur.innerHTML = root.firstChild.firstChild.innerHTML;
-								cur.setAttribute('href', url);
+								cur.setAttribute('href', href);
 								addClass(cur, root.firstChild.className);
 								addClass(cur, root.firstChild.firstChild.className);
 								root.firstChild.removeChild(root.firstChild.firstChild);
@@ -822,6 +822,7 @@
 					tempRoot.appendChild(root.firstChild);
 				} 
 			}
+			alert(tempRoot.outerHTML)
 			return tempRoot;
 		},
 		
@@ -876,6 +877,8 @@
 			    return;
 			}
 			
+			var mainTag = 'a';
+			
             var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
 			var newNode = xtdom.createElement(this.getDocument(), mainTag);
 			var content = range.extractContents()
@@ -883,22 +886,14 @@
 			range.insertNode(newNode)
 			
 			var root = this._handle;
-			
-			if (link) {
-			    var mainTag = 'a';
-			} else {
-			    var mainTag = 'span';
-			}
-			
-			if (mainTag === 'a') {
-			    newNode.setAttribute('href', url);	
-			}
+
+			newNode.setAttribute('href', url);	
 			
 			var style = "";
 			var allTagged = false;
 			var inherit = false;
 			
-			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, url);
+			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style);
 			
 			this._handle.innerHTML = "";
 			
