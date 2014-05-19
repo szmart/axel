@@ -38,6 +38,15 @@
 
     var _timestamp = -1;
 	
+    function _focusAndSelect ( editor ) {
+      // pre-condition: the editor's handle must already have focus
+      try {
+        editor.getDocument().execCommand('selectAll', false, ''); // FIXME: fails on iPad
+      }
+      catch (e) { }
+    }
+
+	
 	/* The format names as displayed on the buttons and their corresponding CSS span.class*/
 	var formatsAndCSS = [ 
 		{name : 'Bold', style : 'bold'},
@@ -387,7 +396,7 @@
 	
 	function closeButtons() {
 	    if (_currentInstance) {
-			_currentInstance._handle.parentNode.removeChild(_buttons);
+			_buttons.parentNode.removeChild(_buttons);
 			_currentInstance.stopEditing(false);
 			_buttons.linkArea.value = 'http://...';
 		    _currentInstance.currentLink = null;
@@ -399,7 +408,7 @@
 	
 	function createModal() {
 		  // Creation of a modal to display warnings
-	      var div = document.createElement('div'); //xtdom.createElement(instance.getDocument(), 'div');
+	      var div = document.createElement('div');
 		  div.setAttribute('class', 'modal');
 		  div.style.display = 'none';
 	      return div;
@@ -435,7 +444,8 @@
 	    _currentInstance = instance;
 		//_buttons.linkArea.value = 'http://...';
 		instance.buttons = _buttons;
-		instance._handle.parentNode.appendChild(_buttons);
+		var buttons = instance.getDocument().adoptNode(_buttons); // necessary on IE
+		instance._handle.parentNode.appendChild(buttons);
 	}
 	
 	function setEditable(instance, value) {
@@ -448,27 +458,36 @@
 	function createButtons() {
 
 		  var container = document.createElement('div');//xtdom.createElement(instance.getDocument(), 'span');
-		   
-		  /*try {
+		  container.setAttribute('class', 'buttons-container');
+		  container.setAttribute('contenteditable', 'false');
+		  
+		  var _offsetX = 0;
+	      var _offsetY = 0;
+		  
 		  container.setAttribute('draggable', 'true');
+		  
 		  function dragStart(ev) {
-		      container.offsetX = parseInt(ev.clientX) - container.style.left;
-			  container.offsetY = parseInt(ev.clientY) - container.style.top;
-			  ev.dataTransfer.effectsAllowed = "move";
+		      var startRect = container.getBoundingClientRect();
+		      _offsetX = parseInt(ev.screenX) - startRect.left;
+			  _offsetY = parseInt(ev.screenY) - startRect.top;
+			  //console.log(_offsetX + " " + _offsetY + " " + parseInt(ev.clientX) + " " + parseInt(ev.clientY))
+			  ev.dataTransfer.effectsAllowed = "copy";
 			  ev.dataTransfer.setData('text', "");
 			  console.log('start')
 			  //console.log(document.outerHTML);
 		  }
 		  
 		  function dragEnd(ev) {
-		      console.log('stop')
+		      //console.log('stop')
 			  //container.innerHTML = "<span>drop</span>"
 		      try {
               //ev.stopPropagation();
-			  alert(parseInt(ev.clientX) - container.offsetX)
-		      container.style.left = (parseInt(ev.clientX) - container.offsetX) + 'px';
-			  container.style.top = (parseInt(ev.clientY) - container.offsetY) + 'px';
-			  alert(container.style.left)
+			  var left = (parseInt(ev.screenX) - _offsetX) + 'px';
+			  var top = (parseInt(ev.screenY) - _offsetY) + 'px';
+			  //console.log(_offsetX + " " + _offsetY + " " + ev.screenX + " " + ev.screenY)
+		      container.style.left = left;
+			  container.style.top = top;
+
 			  } catch (e) {console.log(e)}
           }
 		  
@@ -477,18 +496,14 @@
 			  
           }
 		  
-		  //alert(document.outerHTML);
-		  
-		  xtdom.addEventListener(container, 'dragstart', function (ev) {dragStart(ev); return false;}, false);
-		  xtdom.addEventListener(container, 'dragend', function (ev) {dragEnd(ev)}, false);
-		  xtdom.addEventListener(document, 'drop', function(ev) {drop(ev);}, false);
-		  
-		} catch (e) {alert(e)}
-		*/
-		  var buttons = document.createElement('span');//xtdom.createElement(instance.getDocument(), 'span');
+		  container.addEventListener('dragstart', function (ev) {dragStart(ev)}, false);
+		  container.addEventListener('dragend', function (ev) {dragEnd(ev)}, false);
+		  //xtdom.addEventListener(container, 'dragstart', function (ev) {alert('ok'); ; return false;}, false);
+		  //xtdom.addEventListener(container, 'dragend', function (ev) {dragEnd(ev)}, false);
+		  //xtdom.addEventListener(document, 'drop', function(ev) {drop(ev);}, false);
 
-		  //buttons.setAttribute('style', 'display:none; padding-top:20px;');
-          container.setAttribute('class', 'buttons-container');
+		
+		  var buttons = document.createElement('span');//xtdom.createElement(instance.getDocument(), 'span');
 
 		  
 		  for (var i = 0; i < formatsAndCSS.length; i++) {
@@ -644,6 +659,7 @@
 
         unfocus : function () {
           this.stopEditing(false);
+		  closeButtons();
         },
 		
 		getDefaultData : function () {
@@ -693,22 +709,33 @@
 		    var _this = this;
 		    for (var i = 0; i < this._handle.children.length; i++) {
 		        var child = this._handle.children[i];
+				//child.addEventListener('click', function(ev) {  _this.clickedFrag(ev); return false;}, true);
+				child.addEventListener('paste', function(ev) {_this.interceptPaste(ev, child); return false;}, true);
+				//child.addEventListener('beforepaste', function(ev) {ev.returnValue = false; return false;}, true);
                 xtdom.addEventListener(child, 'click', function(ev) {  _this.clickedFrag(ev); return false;}, true);
-			    xtdom.addEventListener(child, 'paste', function(ev) {  _this.interceptPaste(ev, child);}, true);
+			    //xtdom.addEventListener(child, 'paste', function(ev) {  _this.interceptPaste(ev, child);}, true);
 		    }
 		},
 		
 		interceptPaste : function (event, node) {
-
+			//xtdom.preventDefault(event); // something seems not to work here...
+			event.returnValue = false;
+			event.stopPropagation();
 			event.preventDefault();
-			
+
 			var winText = window.clipboardData ? window.clipboardData.getData("Text") : "";
 			var eventText = event.clipboardData ? event.clipboardData.getData('text') : "";
+			var content = "";
 			if (eventText) {
-			    var content = eventText;
-			} else {
-				var content = winText;
+			    content = eventText;
+			} else if (winText) {
+				content = winText;
+			} 
+			
+			if (content === "") {
+			    return false;
 			}
+			
 
 			var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
 
@@ -721,33 +748,6 @@
 			parent.innerHTML = innerText(parent);
 			
 			return false;  
-
-            /*			
-			
-			var winText = window.clipboardData ? window.clipboardData.getData("Text") : "";
-			var eventText = event.clipboardData ? event.clipboardData.getData('text') : "";
-			if (eventText) {
-			    var content = eventText;
-			} else {
-				var content = winText;
-			}
-			
-			try {
-		    var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
-			
-			} catch (e) {
-			    alert(e)
-			}
-
-			var newNode = xtdom.createElement(this.getDocument(), 'span');
-			newNode.innerHTML = content;
-
-			range.insertNode(newNode)
-		
-		    var store = this._handle.innerHTML;
-			this._handle.innerHTML = store;
-			var _this = this;			
-			setTimeout(function() {_this.regularizePaste(store)}, 2);*/
 			
 		},
 		
@@ -767,7 +767,6 @@
 				} else {
 					prev = current.firstChild;
 					target.appendChild(prev);
-					//xtdom.addEventListener(prev, 'click', function(ev) {  _this.startEditing(ev); }, true);
 				}
 			}
 			this.setListeners();
@@ -817,46 +816,7 @@
 			return tempRoot;
 		},
 		
-		/*regularizePaste : function (node, storedHandle) {
-		    try {
-		    //alert(node.outerHTML)
-			alert(this._handle.parentNode.outerHTML)
-			var text = xtdom.createTextNode(this.getDocument(), innerText(node));
-			while (node.firstChild) {
-			    node.removeChild(node.firstChild);
-			}
-			node.appendChild(text);
-			} catch (e) {alert(e)}
-		
-		    this._handle = storedHandle;
-			
-			//alert(this._handle.outerHTML)
-		    
-
-			var root = xtdom.createTextNode(this.getDocument(), span);
-			root.innerHTML = store;
-			
-			if (inLink(newNode)) {
-			    var mainTag = 'a';
-			} else {
-			    var mainTag = 'span';
-			}
-			
-			var style = "";
-			var allTagged = false;
-			var inherit = false;
-			var url = "";
-			
-			var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, "");
-			
-			this._handle.innerHTML = "";
-			
-			this.cleanTree(this._handle, tempRoot);
-			
-			alert(this._handle.outerHTML)
-			
-	    },*/
-		
+	
 		makeLink : function (urlNode, link) {
 		    var url = urlNode.value;
 			if (url.indexOf('http://') != 0 && url.indexOf('https://') != 0) {
@@ -937,7 +897,6 @@
 		
 		enrich : function (style) {
 
-		    //alert(this._handle.outerHTML)
             var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
 
 			var newNode = xtdom.createElement(this.getDocument(), 'span');
@@ -976,7 +935,8 @@
 		},
 		
 		clickedFrag : function (ev) {
-		    ev.preventDefault();
+		    xtdom.preventDefault(ev);
+			
 			var target = xtdom.getEventTarget(ev);
 			var tag = xtdom.getLocalName(target);
 			if (tag.toUpperCase() === 'A') {
@@ -1013,11 +973,12 @@
 		__open__editor : function () {
           if (this.editInProgress === false) {
             this.editInProgress = true;
+			setEditable(this, 'true');
 			registerEditor(this);
             // registers to keyboard events
-            this.kbdHandlers = this.keyboard.register(this, this._handle);
+            this.kbdHandlers = this.keyboard.register(this, this._handle.parentNode);
             this.keyboard.grab(this, this);
-			if (this.getParam('multilines') == 'normal') {
+			if (this.getParam('multilines') === 'normal') {
                 this.keyboard.enableRC(true);
             }
     //        xtdom.removeClassName(this._handle, 'axel-core-editable');
@@ -1072,6 +1033,7 @@
 		  
 		  if (/^\s*$/.test(innerText(this._handle))) {
 		      this._setData(this.getDefaultData());
+			  this.setListeners();
 		  }
 		  
         },
@@ -1092,6 +1054,7 @@
         },
 
         handleBlur : function (ev) {
+          this.stopEditing(false);
         }
       }
     };

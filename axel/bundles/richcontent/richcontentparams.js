@@ -22,4 +22,4 @@
 
   //alert(JSON.stringify($axel))
   
-  //xtiger.resourcses.addJSON('richContent', {blabla : blublu});
+  //alert($axel)

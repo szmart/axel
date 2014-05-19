@@ -44,6 +44,7 @@
 	    height: 10pt; 
 		font-size: 9pt;
 		margin: 8pt 3px 0px 3px; 
+		overflow: auto;
 	}
 	
 	.edit-button {
@@ -79,9 +80,10 @@
 	
 	.buttons-container {
 		padding:20px; 
+		float:left;
 		position: fixed; 
 		top: 30px; 
-		right: 20px;
+		left: 30px;
 	    background-color: #F0F0F0;
 	    border: 1px solid black;
         -moz-border-radius: 5px;
