@@ -14,8 +14,16 @@
 
 (function ($axel) {
 
+    /*
+	 The tag used to create the root of the editing field by default.
+	*/
 	var handleTag = 'span'; //default is span
 	
+	/*
+	 Creates the editor's handle. By default, the handle will be a `span', but
+	 other choices are possible, such as `pre' if the multilines option is
+	 defined in the parameters.	 
+	*/
 	var _Generator = function ( aContainer, aXTUse, aDocument ) {
 		var params = aXTUse.getAttribute('param');
 		var paramDict = {};
@@ -33,10 +41,13 @@
 
 	// Uses a closure to store class level private utility properties and functions
 	var _Editor = (function () {
-
+        
+		/*
+		  The regex pattern used to define a valid URL.
+		*/
 		var urlPattern = new RegExp(/[-a-zA-Z0-9@:%_\+.~#?&//=]{2,}\.[a-z]{2,}\b(\/[-a-zA-Z0-9@:%_\+.~#?&//=]*)?/gi);
 
-		var _timestamp = -1;
+		//var _timestamp = -1;
 
 		/*function _focusAndSelect ( editor ) {
 	// pre-condition: the editor's handle must already have focus
@@ -46,7 +57,9 @@
 	catch (e) { }
 	}*/
 
-		/* The format names as displayed on the buttons and their corresponding CSS span.class*/
+		/* 
+		  The format names as displayed on the buttons and their corresponding CSS span.class
+		*/
 		var formatsAndCSS = [
 			{name : 'Bold', style : 'bold'},
 			{name : 'Italics', style : 'italics'},
@@ -54,7 +67,18 @@
 			{name : 'Strike', style : 'line-through'}
 		];
 		
-
+        /*
+		  The default structure of the data to be loaded and saved. Two main structures should 
+		  be defined. In the html-like structure, links are represented as nodes (by default with a
+		  `a' tag) parents to some text content and bearing a target attribute (by default, a
+		  `href'). In the `fragment' case, links are parents to two nodes: a `text'-tagged
+		  node containing some text child, and a `ref' child containing the target url. In both
+		  cases, the text can be qualified by a style attribute.
+		  
+          The structure defined here-below, as well as in formatsAndCSS, represent the default
+		  choices. The user can redefine them in the associated file richcontentparams.js (quae
+          uide).
+        */  		  
 		var dataStructure = {
 			html : {
 				link : {tag : 'a', ref : 'href', style : 'class'},
@@ -66,7 +90,9 @@
 			}
 		}
 
-
+        /*
+		 Extracts the formats used by the editor, as defined in formatsAndCSS
+		*/
 		function _formats(formatsAndCSS) {
 			var ret = []
 			for (var i = 0; i < formatsAndCSS.length; i++) {
@@ -75,8 +101,17 @@
 			return ret;
 		}
 
+		/*
+		  A list of formats recognized by the editor.
+		*/
 		var allowedCSS = _formats(formatsAndCSS);
 		
+		/*
+		  Checks whether parameters different from the default ones have been
+		  attached to the main window (see richcontentparams.js for an example).
+		  If this is the case the relevant parameters will be applied in lieu of 
+		  the default ones.
+		*/
 		function checkAndSetParams(doc) {
 			var win = doc.defaultView || doc.parentWindow; 
 	        var axelParamsRichContent = win ? win.axelParams ? win.axelParams['richContent'] : null : null;
@@ -94,12 +129,17 @@
 			}
 		}
 
+		/*
+		  Whether some style (i.e. some string containing a sequence of CSS 
+		  classes separated by spaces) is recognized by the
+          editor.
+        */		  
 		function allowedStyle(style) {
 			if (!style) {
 				return null;
 			}
 
-			var splits = style.split(/ /);
+			var splits = style.split(/ /); // we should allow for several spaces !!!!
 			var ret = [];
 			for (var i = 0; i < splits.length; i++) {
 				if (allowedCSS.indexOf(splits[i]) !== -1) {
@@ -109,7 +149,11 @@
 			return ret.join(' ');
 		}
 
-		var _getPopupDevice = function (aDocument) {
+		/* 
+		  Returns the pop-up device asking the user whether a link 
+		  just clicked should be opened or edited.
+        */		  
+		function _getPopupDevice (aDocument) {
 			var devKey = 'popupdevice';
 			var device = xtiger.session(aDocument).load(devKey);
 			if (! device) {  // lazy creation
@@ -119,6 +163,11 @@
 			return device;
 		};
 
+		/*
+		  Returns the text content of some parent node, rid of any
+		  HTML tag. The individual text pieces of the leaves are
+		  concatenated together into a single string.
+		*/
 		function innerText(node) {
 			if (node.nodeType == xtdom.TEXT_NODE) {
 				return node.textContent;
@@ -133,7 +182,11 @@
 			}
 		}
 		
-		function escapeXMLchars(str) {
+		/*
+		  Replaces the HTML special characters inside a string
+		  with their safe equivalents.
+		*/
+		function escapeHTMLchars(str) {
 		    return str;
 			var cleaned = [];
 			var arr = str.split("");
@@ -159,6 +212,11 @@
 			return cleaned.join('');
 		}
 
+		/*
+		  Extracts the content of a tree organized along the `fragment'
+		  structure and turns it into an HTML tree appropriate for the
+		  editor.
+		*/
 		function extractFragmentContentXT(node) {
 
 			var dataConfig = dataStructure.fragments;
@@ -212,11 +270,10 @@
 		}
 
 		/*
-	    Extracts the content of an XTiger node. We need a function different from the default
-	    xtdom.extractDefaultContentXT() because the latter only extracts text content (by
-	    concatenating the inner HTML of possible subnodes). Any formatting information is lost in
-	    the process. Our method keeps the CSS formatting of span subnodes mentionned in formatsAndCSS.
-	    */
+		  Extracts the content of a tree organized along the `HTML'
+		  structure and turns it into an HTML tree regularized and
+		  appropriate for the editor.
+		*/
 		function extractHTMLContentXT(node) {
 			var dataConfig = dataStructure.html;
 			if (xtiger.ATTRIBUTE == xtdom.getNodeTypeXT(node)) {
@@ -262,12 +319,19 @@
 			return root;
 		}
 
-
+        /*
+		  Extracts the default content of the editor.
+		  This is a hack to replace the standard default method of the same
+		  name in xtdom, as it removes any tag.
+		*/
 		xtdom.extractDefaultContentXT = function (node) {
 			return node;
 		}
 
-
+        /*
+		  Regularizes the content
+		*/
+		// Test whether this is useful
 		function normalize(content, doc) {
 			// TODO should normalize ill-formed data as much as possible
 
@@ -279,11 +343,22 @@
 			return content;
 		}
 
+		/*
+		  Turns a class attribute made of a sequence of 
+		  CSS classes into a richStyle attribute with 
+		  style names separated by `_'.
+		*/
 		function classToFragStyle(className) {
 			return className.replace(/\s+/g, '_');
 		}
+		
+		// Check that the span and fragments style use the correct style attributes...
 
-		function logToSpans(root, logger) {
+		/*
+		  Creates a lof of the content of the root argument in accordance
+		  with a HTML style structure.
+		*/
+		function logToSpans(root, logger) { // keep that name ???
 			var dataConfig = dataStructure.html;
 			for (var i = 0; i < root.childNodes.length; i++) {
 				if (root.childNodes[i].tagName === 'a' && root.childNodes[i].href) {
@@ -311,6 +386,10 @@
 			}
 		}
 
+		/*
+		  Creates a log of the content of the root argument in accordance
+		  with the `fragment' structure.
+		*/
 		function logToFragments(root, logger) {
 			var dataConfig = dataStructure.fragments;
 			for (var i = 0; i < root.childNodes.length; i++) {
@@ -341,51 +420,78 @@
 			}
 		}
 
+		/*
+		  Turns a rich style attribute as a list
+		  of format separated by `_' into a class
+		  attribute suitable for an HTML element.
+		*/
 		function fragStyleToClass(richStyle) {
 			return richStyle.replace(/_/g, ' ');
 		}
 
-		function inheritClass(node, tag) {
-			if (hasClass(node, tag)) {
+		/*
+		  Whether a node bears a class or descends from a 
+		  node bearing this class.
+		*/
+		function inheritClass(node, className) {
+			if (hasClass(node, className)) {
 				return true;
 			} else if (! node.parentNode) {
 				return false
 			} else {
-				return inheritClass(node.parentNode, tag);
+				return inheritClass(node.parentNode, className);
 			}
 		}
 
-		function hasClass(node, tag) {
+		/*
+		  Whether a node has some CSS class mentioned
+          among its class attribute.
+        */		  
+		function hasClass(node, className) {
 			if (node.getAttribute) {
-				return (' ' + node.getAttribute('class') + ' ' ).indexOf(' ' + tag + ' ') != -1;
+				return (' ' + node.getAttribute('class') + ' ' ).indexOf(' ' + className + ' ') != -1;
 			} else {
 				return false;
 			}
 		}
 
-		function allChildrenTagged(node, tag) {
+		/*
+		  Whether all the children of some node bear some
+		  class.
+		*/
+		function allChildrenTagged(node, className) {
 			for (var i = 0; i < node.childNodes.length; i++) {
-				if (! hasClass(node.childNodes[i], tag) && node.childNodes[i].innerHTML !== "") {
+				if (! hasClass(node.childNodes[i], className) && node.childNodes[i].innerHTML !== "") {
 					return false;
 				}
 			}
 			return true;
 		}
 
-		function addClass(node, tag) {
-			if (! tag) {
+		/*
+		  Adds a CSS class to the class attribute some node.
+		*/
+		function addClass(node, className) {
+			if (! className) {
 				return;
 			}
-			if (! hasClass(node, tag)) {
-				node.className = (node.className + ' ' + tag).trim();
+			if (! hasClass(node, className)) {
+				node.className = (node.className + ' ' + className).trim();
 			}
 		}
 
-		function removeClass(node, tag) {
-			var className = (' ' + node.className + ' ').replace(' ' + tag + ' ', ' ').trim();
+		/*
+		  Removes a class name from the class attribute of some node.
+		*/
+		function removeClass(node, className) {
+			var className = (' ' + node.className + ' ').replace(' ' + className + ' ', ' ').trim();
 			node.className = className;
 		}
 
+		/*
+		  Whether two nodes are endowed with the same set of
+		  CSS classes, albeit in a possibly different order.
+		*/
 		function equalClasses(primus, secundus) {
 			var pri = primus.className.match(/\S+/g);
 			var sec = secundus.className.match(/\S+/g);
@@ -413,10 +519,17 @@
 			return true;
 		}
 
+		/*
+		  Whether two nodes have the same tags.
+		*/
 		function equalTags(primus, secundus) {
 			return primus.tagName === secundus.tagName;
 		}
 
+		/*
+		  Whether a node is a `a' element or descends from
+		  such element.
+		*/
 		function inLink(node) {
 			if (node.href) {
 				return node.href;
@@ -427,6 +540,9 @@
 			}
 		}
 
+		/*
+		  Removes all classes from a node
+		*/
 		function removeAllClasses(node) {
 			if (node.nodeType === xtdom.TEXT_NODE) {
 				return;
@@ -437,19 +553,14 @@
 			}
 		}
 
-		function closeButtons() {
-			if (_currentInstance) {
-			    var buttons = _getBUttons();
-				buttons.parentNode.removeChild(buttons);
-				_currentInstance.stopEditing(false);
-				buttons.linkArea.value = 'http://...';
-				_currentInstance.currentLink = null;
-				_currentInstance._url = null;
-			}
-		}
-
+		/*
+		  A modal window used to display a warning to the user.
+		*/
 		var _modal = createModal();
 
+		/*
+		  Creates a modal window.
+		*/
 		function createModal() {
 			// Creation of a modal to display warnings
 			var div = document.createElement('div');
@@ -458,6 +569,11 @@
 			return div;
 		}
 
+		/*
+		  Displays the modal over the current editable field.
+		  The field is made non-editable as long as the modal
+		  is visible. The modal can be closed by clicking it.
+		*/
 		function showModal(instance, text) {
 			_modal.textContent = text;
 			_modal.style.display = 'block';
@@ -479,8 +595,28 @@
 			});
 		}
 
-		var _buttons = null;
+		/*
+		  The menu holding the buttons and the link editing area
+	    */
+		var _buttons = null; // keep that name ??
 		
+		/*
+		  Hides the menu.
+		*/
+		function closeButtons() {
+			if (_currentInstance) {
+			    var buttons = _getBUttons();
+				buttons.parentNode.removeChild(buttons);
+				_currentInstance.stopEditing(false);
+				buttons.linkArea.value = 'http://...';
+				_currentInstance.currentLink = null;
+				_currentInstance._url = null;
+			}
+		}
+		
+		/*
+		  Returns a reference to the menu.
+		*/
 		function _getBUttons() {
 		    if (! _buttons) {
 			    _buttons = createButtons();
@@ -488,8 +624,17 @@
 			return _buttons;
 		}
 
+		/*
+		  A reference to the currently editable field. 
+		  We assume only one field on the page can be edited at
+		  a time. Any action on the field will be applied to
+		  its elements.
+		*/
 		var _currentInstance = null;
 
+		/*
+		  Sets an editable field as the current one.
+		*/
 		function registerEditor(instance) {
 			_currentInstance = instance;
 			//_buttons.linkArea.value = 'http://...';
@@ -498,6 +643,9 @@
 			instance._handle.parentNode.appendChild(buttons);
 		}
 
+		/*
+		  Sets a handle as editable or not, depending on the value.
+		*/
 		function setEditable(instance, value) {
 			xtdom.setAttribute(instance._handle, 'contenteditable', value);
 			// For some reason, the paste works only occasionally when the parent node is not
@@ -505,6 +653,13 @@
 			xtdom.setAttribute(instance._handle.parentNode, 'contenteditable', value);
 		}
 
+		/*
+		  Creates the menu. 
+		  
+		  This is a div node, with a list of buttons matching the definitions in
+		  formatsAndCSS plus a `clear' button. The menu also contains a link edition
+		  area and a `close' button to hide it.
+		*/
 		function createButtons() {
 
 			var container = document.createElement('div');//xtdom.createElement(instance.getDocument(), 'span');
@@ -647,7 +802,7 @@
 				if (this.getParam('noedit') !== 'true') {
 					xtdom.addClassName(this._handle, 'axel-core-editable');
 					// 'mousedown' always preceeds 'focus', saves shiftKey timestamp to detect it in forthcoming 'focus' event
-					xtdom.addEventListener(this._handle, 'mousedown', function(ev) { if (ev.shiftKey) { _timestamp = new Date().getTime(); } }, true);
+					//xtdom.addEventListener(this._handle, 'mousedown', function(ev) { if (ev.shiftKey) { _timestamp = new Date().getTime(); } }, true);
 					// tracks 'focus' event in case focus is gained with tab navigation  (no shiftKey)
 					this.setListeners();
 					/*if (xtiger.cross.UA.gecko) {  // gecko: prevent browser from selecting contentEditable parent in triple clicks !
@@ -721,7 +876,7 @@
 				// Sets editor model value. Takes the handle and updates its DOM content.
 				_setData : function (aData) {
 
-					while (this._handle.firstChild) {
+					while (this._handle.firstChild) { //is there a remove-all-children function ??
 						this._handle.removeChild(this._handle.firstChild);
 					}
 					while (aData.firstChild) {
@@ -757,11 +912,19 @@
 						//child.addEventListener('click', function(ev) {  _this.clickedFrag(ev); return false;}, true);
 						child.addEventListener('paste', function(ev) {_this.interceptPaste(ev, child); return false;}, true);
 						//child.addEventListener('beforepaste', function(ev) {ev.returnValue = false; return false;}, true);
-						xtdom.addEventListener(child, 'click', function(ev) {  _this.clickedFrag(ev); return false;}, true);
+						xtdom.addEventListener(child, 'click', function(ev) {  _this.startEditing(ev); return false;}, true);
 						//xtdom.addEventListener(child, 'paste', function(ev) {  _this.interceptPaste(ev, child);}, true);
 					}
 				},
 
+				/*
+				  Intercepts a paste event, and replaces it with a custom paste.
+				  
+				  The default behaviour is prevented to occur, the content of the
+				  clipboard is extracted in text format (i.e. any HTML tag and attribute
+				  is discarded), and the content is finally inserted at the cursor's 
+				  position into the handle.
+				*/
 				interceptPaste : function (event, node) {
 					//xtdom.preventDefault(event); // something seems not to work here...
 					event.returnValue = false;
@@ -781,7 +944,7 @@
 						return false;
 					}
 
-					//content = escapeXMLchars(content);
+					//content = escapeHTMLchars(content);
 					//alert(content)
 
 					var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
@@ -799,6 +962,15 @@
 
 				},
 
+				/*
+				  Creates a simplified and regularized version of a tree with current
+				  as its root and roots it in the target node.
+				  
+				  The editing and pasting operations tend to complicate the structure of the handle
+				  by introducing empty subnodes or sequences of nodes bearing the same attributes.
+				  This function will remove the first, and merge the second ones.
+				  
+				*/
 				cleanTree : function (target, current) {
 					var prev = current.firstChild;
 					target.appendChild(prev);
@@ -820,6 +992,15 @@
 					this.setListeners();
 				},
 
+				/*
+				  Recreates a handle tree with the proper structure.
+				  
+				  The handle should be the parent of a list of `span' and `a' nodes,
+				  each containing only a text node. The insertion of new content
+				  caused by the edition disturbs that structure. This method will
+				  reshape the tree, in accordance with the desired effect (adding a style,
+				  creating a link, etc.).
+				*/
 				recreateTree : function (root, mainTag, allTagged, inherit, style, link) {
 
 					var tempRoot = xtdom.createElement(this.getDocument(), 'span');
@@ -864,9 +1045,18 @@
 					return tempRoot;
 				},
 
-
-				makeLink : function (urlNode, link) {
-					var url = urlNode.value;
+                /*
+				  Turns the selection into a link (if `link' is true), or suppresses
+				  any link in the selection (if `link' is false).
+				  
+				  The value of linkArea will be used as target if it conforms to the
+				  pattern of valid urls. Otherwise a warning will pop up and the process
+				  will stop.
+				*/
+				makeLink : function (linkArea, link) {
+				
+				    // We should check whether the user is trying to unlink a non-link or vice-versa
+					var url = linkArea.value;
 					if (url.indexOf('http://') != 0 && url.indexOf('https://') != 0) {
 						url = 'http://' + url;
 					}
@@ -906,12 +1096,18 @@
 					this.cleanTree(this._handle, tempRoot);
 				},
 
+				/*
+				  Sets the currently selected link target to a new value.
+				*/
 				changeLink : function (linkArea) {
 					if (this.currentLink && linkArea.value.match(urlPattern)) {
 						this.currentLink.href = linkArea.value;
 					}
 				},
 
+				/*
+				  Clears the selected range from any style.
+				*/
 				clearRange : function () {
 
 					var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
@@ -943,6 +1139,9 @@
 					this.cleanTree(this._handle, tempRoot);
 				},
 
+				/*
+				  Adds a new style to the current selection.
+				*/
 				enrich : function (style) {
 
 					var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
@@ -982,44 +1181,51 @@
 
 				},
 
-				clickedFrag : function (ev) {
+				
+				/*clickedFrag : function (ev) {
 					xtdom.preventDefault(ev);
 
 					var target = xtdom.getEventTarget(ev);
 					var tag = xtdom.getLocalName(target);
 					if (tag.toUpperCase() === 'A') {
-						_getBUttons().linkArea.value = target;
-						this.currentLink = target;
+
 					} else {
 						//_buttons.linkArea.value = 'http://...';
-						this.currentLink = null;
+						
 					}
 					if (ev && this.editInProgress === false) {
 						this.startEditing(ev);
 					}
-				},
+				},*/
 
 
 				// Starts editing the field (to be called once detected)
 				startEditing : function (ev) {
+					ev.returnValue = false;
+					ev.stopPropagation();
+					ev.preventDefault();
+					
 					if (ev && this.editInProgress == false) {
 						var target = xtdom.getEventTarget(ev);
 						var tag = xtdom.getLocalName(target);
 						if (tag.toUpperCase() === 'A') { // clicked on a link
-							xtdom.preventDefault(ev);
-							xtdom.stopPropagation(ev); // prevents link opening
+						    _getBUttons().linkArea.value = target;
+						    this.currentLink = target;
 							var popupdevice = _getPopupDevice(this.getDocument());
 							this._url = target.href;
 							popupdevice.startEditing(this, ['edit', 'open'], 'edit', target);
 						} else {
+						    this.currentLink = null;
 							this.__open__editor();
 						}
 					}
 
 				},
 
+				/*
+				  Makes the editor visible.
+				*/
 				__open__editor : function () {
-					this.keyboard.disableRC(false);
 					if (this.editInProgress === false) {
 						this.editInProgress = true;
 						setEditable(this, 'true');
@@ -1029,6 +1235,8 @@
 						this.keyboard.grab(this, this);
 						if (this.getParam('multilines') === 'normal') {
 							this.keyboard.enableRC(true);
+						} else {
+					        this.keyboard.disableRC(false);
 						}
 						//        xtdom.removeClassName(this._handle, 'axel-core-editable');
 							/*if ((!this.isModified()) || ((_timestamp !== -1) && ((_timestamp - new Date().getTime()) < 100))) {
@@ -1044,6 +1252,9 @@
 					}
 				},
 
+				/*
+				  Reacts to the choice of the user on the link-popup.
+				*/
                 onMenuSelection: function onMenuSelection (aSelection) {
 					if (aSelection == 'edit') {
 						this.__open__editor();
@@ -1057,7 +1268,7 @@
 				stopEditing : function (isCancel) {
 					if ((! this.stopInProgress) && (this.editInProgress !== false)) {
 						this.stopInProgress = true;
-						_timestamp = -1;
+						//_timestamp = -1;
 						this.keyboard.unregister(this, this.kbdHandlers);
 						this.keyboard.release(this, this);
 						xtdom.removeEventListener(this._handle, 'blur', this.blurHandler, false);

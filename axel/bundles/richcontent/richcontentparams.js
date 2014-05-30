@@ -18,8 +18,27 @@
  To mention in the how-to : must include a link to richcontentparams.js and richcontent.css
  */
  
-  //alert('ok')
-
-  //alert(JSON.stringify($axel))
+    if (! window.axelParams) {
+        window.axelParams = {};
+    }
   
-  //alert($axel)
+    window.axelParams['richContent'] = {
+        formatsAndCSS : [
+			{name : 'Bold', style : 'bold'},
+			{name : 'Italics', style : 'italics'},
+			{name : 'Underline', style : 'underline'},
+			{name : 'Strike', style : 'line-through'}
+		],
+		
+		dataStructure : {
+			html : {
+				link : {tag : 'a', ref : 'href', style : 'class'},
+				standard : {tag : 'span', style : 'class'}
+			},
+			fragments : {
+				link : {tag : 'Link', ref : {tag : 'LinkRef'}, text : {tag : 'LinkText', style : 'RichStyle'}},
+				standard : {tag : 'Fragment', style : 'RichStyle'}
+			}
+		}
+  
+    }
