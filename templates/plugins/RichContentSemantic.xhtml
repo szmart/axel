@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:xt="http://ns.inria.org/xtiger" xml:lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1" />
+
+
+    <title>The "rich content" plugin</title>
+
+    <xt:head version="1.1" templateVersion="1.0" label="Demo">
+    </xt:head>
+
+    <style type="text/css">
+      .axel-core-editable[contenteditable] {
+        aboutline: thin dashed #bbffdd;
+      }
+      .multi {
+        -moz-column-count: 2;
+        -moz-column-gap: 25px;
+        -webkit-column-count: 2;
+        -webkit-column-gap: 25px;
+      }
+      span.styled {
+        font-size: 120%;
+        font-family: Garamond, Arial;
+        color: brown;
+      }
+	  
+
+    </style>
+
+    <!-- template enrichment : extracts and generates xt:attribute and xt:use sample code -->
+    <link rel="stylesheet" type="text/css" href="../shared/demo.css" />
+    <script type="text/javascript" src="../../3rd-part/jquery/js/jquery-1.7.1.min.js"></script>
+    <script type="text/javascript" src="../shared/demo.js"></script>
+	<link rel="stylesheet" href="../../axel/bundles/richcontent/richcontent.css" type="text/css"></link>
+    <script type="text/javascript">
+	 
+	  // In a typical installation, this would rather go in bundles/richcontent/richcontentparams.js
+	  
+	if (! window.axelParams) {
+        window.axelParams = {};
+    }
+  
+    window.axelParams['richContent'] = {
+        formatsAndCSS : [
+			{name : 'Important', style : 'important'},
+			{name : 'Ironic', style : 'irony'},
+			{name : 'Stupid', style : 'stupid'},
+			{name : 'Platitude', style : 'platitude'},
+			{name : 'Clever', style : 'clever'}
+		],
+	}
+	 
+	</script>
+	
+	<style type="text/css">
+      .important {
+	    font-weight: bold;
+	  }
+	  
+	  .irony {
+		color: orange;
+	  }
+	  
+	  .stupid {
+	    color: green;
+	  }
+	  
+	  .platitude {
+	    color: blue;		
+	  }
+	  
+	  .clever {
+	    font-weight: bold;
+	    color: red;		
+	  }
+    </style>
+	
+  </head>
+  <body>
+
+
+    <h1>The <code>"rich content"</code> plugin</h1>
+
+    <h2>Semantic example</h2>
+
+    <ul class="parameters">
+      <li><var>noedit</var> (<code><b>true</b>|<b>false</b></code>) : set it  to <code><b>true</b></code> to make the field read only (constant).</li>
+      <li><var>class</var> (<code><i>name</i></code>) : set a class name on the handle.</li>
+	  <li><var>lang</var> (<code><i>fragments</i>|<i>html</i></code>|<i>semantic</i>) : set the input/output format (default is <code><i>fragments</i></code>).</li>
+	  <li><var>multilines</var> (<code><i>normal|none</i></code>) : allows for line breaks in the editable content.</li>
+    </ul>
+
+	<p>The `semantic' configuration accepts an input composed of a list of custom, user-chosen tags, supposedly representing some categories of meaning. The semantic tags can match CSS classes with the same names, and will be displayed in accordance with the definition of the classes. Non meaningful nodes can be created with the <code>Text</code>, and <code>Link</code> tags. The latter should assume the same structure as the links of the `fragments' configuration, with a `LinkRef' subnode containing the target, and a subnode containing some semantic tag for the texte (or the non-meaningful <code>Text</code> tag).</p>
+
+    <div class="demo extract">
+        <p><xt:use types="richContent" label="parag" param="lang=semantic"><Text>
+Lorem ipsum dolor sit amet, consectetur adipiscing elit. Cras sit amet rhoncus nisl. Ut a leo enim. Nunc ullamcorper sem et orci sollicitudin, id sagittis justo pretium. Aenean vel molestie tellus. Fusce nulla nisl, scelerisque eu fermentum sed, posuere non metus. Donec in lacus dolor. Ut ullamcorper, libero ac rhoncus laoreet, tellus massa varius urna, sit amet blandit quam lectus non sem. Aliquam erat volutpat. Quisque non sapien in risus suscipit eleifend. Phasellus et sapien dapibus, tincidunt justo vel, laoreet ipsum. Donec rutrum sodales velit, in ornare neque egestas in. Pellentesque commodo mauris velit, eu hendrerit urna interdum at. Suspendisse bibendum, sem in porta tincidunt, nisl massa posuere erat, in placerat quam nisl id dolor. Nunc consequat ante eget tellus ultricies, ac commodo enim tincidunt. Fusce mattis metus ac egestas iaculis. Etiam sit amet feugiat eros. Integer vel odio leo. Aliquam vitae massa sit amet mauris auctor volutpat at at velit. Curabitur fringilla elit id nibh iaculis dignissim. Vivamus nunc risus, porta eu venenatis nec, sollicitudin faucibus velit. Curabitur eleifend sapien purus, ut placerat lorem pretium in. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas.
+</Text></xt:use><xt:menu-marker/></p>
+    </div>
+	
+
+  </body>
+</html>

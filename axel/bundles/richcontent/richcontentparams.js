@@ -38,7 +38,10 @@
 			fragments : {
 				link : {tag : 'Link', ref : {tag : 'LinkRef'}, text : {tag : 'LinkText', style : 'RichStyle'}},
 				standard : {tag : 'Fragment', style : 'RichStyle'}
+			},
+			semantic : {
+				link : {tag : 'Link', ref : {tag : 'LinkRef'}, text : {standard : 'LinkText'}},
+				standard : {tag : 'Text'}
 			}
 		}
-  
     }

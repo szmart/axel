@@ -14,11 +14,8 @@
 
 (function ($axel) {
 
-    /*
-	 The tag used to create the root of the editing field by default.
-	*/
-	var handleTag = 'span'; //default is span
-	
+   // Mention the issue with the listeners
+
 	/*
 	 Creates the editor's handle. By default, the handle will be a `span', but
 	 other choices are possible, such as `pre' if the multilines option is
@@ -75,6 +72,10 @@
 		  node containing some text child, and a `ref' child containing the target url. In both
 		  cases, the text can be qualified by a style attribute.
 		  
+		  The `semantic' structure is to be defined by the user with its own categories. The node 
+		  tags themselves will serve as formats (provided they are among the allowed CSS recognized
+		  by the editor). 
+		  
           The structure defined here-below, as well as in formatsAndCSS, represent the default
 		  choices. The user can redefine them in the associated file richcontentparams.js (quae
           uide).
@@ -87,6 +88,10 @@
 			fragments : {
 				link : {tag : 'Link', ref : {tag : 'LinkRef'}, text : {tag : 'LinkText', style : 'RichStyle'}},
 				standard : {tag : 'Fragment', style : 'RichStyle'}
+			},
+			semantic : {
+				link : {tag : 'Link', ref : {tag : 'LinkRef'}, text : {standard : 'LinkText'}},
+				standard : {tag : 'Text'}
 			}
 		}
 
@@ -105,6 +110,19 @@
 		  A list of formats recognized by the editor.
 		*/
 		var allowedCSS = _formats(formatsAndCSS);
+		
+		/*
+		  Check for String equality irrespective of their case.
+		  I.e. eqStrings("a", "a") and eqStrings("A", "a") should be true,
+		  while eqStrings("a", "b") and eqStrings("A", "b") should be false.
+		*/
+		function eqStrings(str_1, str_2) {
+		    if (typeof str_1 === 'string'  && typeof str_2 === 'string') {
+		        return str_1.toUpperCase() === str_2.toUpperCase();
+			} else {
+			    return false;
+			}
+		}
 		
 		/*
 		  Checks whether parameters different from the default ones have been
@@ -127,12 +145,18 @@
 			if (axelParamsRichContent.dataStructure && axelParamsRichContent.dataStructure.fragments) {
 				dataStructure.fragments = axelParamsRichContent.dataStructure.fragments; 
 			}
+			
+			if (axelParamsRichContent.dataStructure && axelParamsRichContent.dataStructure.semantic) {
+				dataStructure.semantic = axelParamsRichContent.dataStructure.semantic; 
+			}
 		}
 
 		/*
 		  Whether some style (i.e. some string containing a sequence of CSS 
 		  classes separated by spaces) is recognized by the
-          editor.
+          editor. 
+		  
+		  The return value is a string of allowed CSS classes separated by spaces.
         */		  
 		function allowedStyle(style) {
 			if (!style) {
@@ -226,29 +250,32 @@
 					return null;
 				}
 			}
+			
 
 			if (node.childNodes) {
 				var root = document.createElement('span');
 				var cur;
 				while (node.firstChild) {
 					cur = node.firstChild;
-					if (cur.nodeType === xtdom.ELEMENT_NODE && cur.tagName === dataConfig.standard.tag) {
+					if (cur.nodeType === xtdom.ELEMENT_NODE && eqStrings(cur.tagName, dataConfig.standard.tag)) {
 						var span = document.createElement('span');
 						span.innerHTML = innerText(cur);
-						var style = allowedStyle(cur.getAttribute(dataConfig.standard.style));
+						var styleAttribute = fragStyleToClass(cur.getAttribute(dataConfig.standard.style));
+						var style = allowedStyle(styleAttribute);
 						if (style) {
 							span.setAttribute('class', style);
 						}
 						node.removeChild(cur);
 						root.appendChild(span);
-					} else  if (cur.nodeType === xtdom.ELEMENT_NODE && cur.tagName === dataConfig.link.tag) {
+					} else if (cur.nodeType === xtdom.ELEMENT_NODE && eqStrings(cur.tagName, dataConfig.link.tag)) {
 						var a = document.createElement('a');
 						while (cur.firstChild) {
-							if (cur.firstChild.tagName === dataConfig.link.ref.tag) {
+							if (eqStrings(cur.firstChild.tagName, dataConfig.link.ref.tag)) {
 								a.setAttribute('href', cur.firstChild.innerHTML);
-							} else if (cur.firstChild.tagName === dataConfig.link.text.tag) {
+							} else if (eqStrings(cur.firstChild.tagName, dataConfig.link.text.tag)) {
 								a.innerHTML = cur.firstChild.innerHTML;
-								var style = allowedStyle(cur.firstChild.getAttribute(dataConfig.link.text.style));
+								var styleAttribute = fragStyleToClass((cur.getAttribute(dataConfig.standard.style)));
+								var style = allowedStyle(styleAttribute);
 								if (style) {
 									a.setAttribute('class', style);
 								}
@@ -288,7 +315,7 @@
 				var cur;
 				while (node.firstChild) {
 					cur = node.firstChild;
-					if (cur.nodeType === xtdom.ELEMENT_NODE && cur.tagName === dataConfig.standard.tag) {
+					if (cur.nodeType === xtdom.ELEMENT_NODE && eqStrings(cur.tagName, dataConfig.standard.tag)) {
 						var span = document.createElement('span');
 						span.innerHTML = innerText(cur);
 						var style = allowedStyle(cur.getAttribute(dataConfig.standard.style));
@@ -297,7 +324,7 @@
 						}
 						node.removeChild(cur);
 						root.appendChild(span);
-					} else  if (cur.nodeType === xtdom.ELEMENT_NODE && cur.tagName === dataConfig.link.tag) {
+					} else  if (cur.nodeType === xtdom.ELEMENT_NODE && eqStrings(cur.tagName, dataConfig.link.tag)) {
 						var a = document.createElement('a');
 						a.setAttribute('href', cur.getAttribute(dataConfig.link.ref));
 						a.innerHTML = innerText(cur);
@@ -318,6 +345,71 @@
 
 			return root;
 		}
+		
+		/*
+		  Extracts the content of a tree organized along the `semantic'
+		  structure and turns it into an HTML tree regularized and
+		  appropriate for the editor.
+		*/		
+		function extractSemanticContentXT(node) {
+
+			var dataConfig = dataStructure.semantic;
+			if (xtiger.ATTRIBUTE == xtdom.getNodeTypeXT(node)) {
+				var dump = node.getAttribute('default');
+				if (dump && (-1 === dump.search(/\S/)))  {
+					return null;
+				}
+			}
+			
+			//alert(node)
+
+			if (node.childNodes) {
+				var root = document.createElement('span');
+				var cur;
+				while (node.firstChild) {
+					cur = node.firstChild;
+					var style = allowedStyle(cur.tagName);
+					if (cur.nodeType === xtdom.ELEMENT_NODE && (eqStrings(cur.tagName, dataConfig.standard.tag) || style)) {
+						var span = document.createElement('span');
+						span.innerHTML = innerText(cur);
+						var styleAttribute = fragStyleToClass(cur.tagName);
+						var style = allowedStyle(styleAttribute);
+						if (! eqStrings(style, dataConfig.standard.tag)) {
+							span.setAttribute('class', style);
+						}
+						node.removeChild(cur);
+						root.appendChild(span);
+					} else if (cur.nodeType === xtdom.ELEMENT_NODE && eqStrings(cur.tagName, dataConfig.link.tag)) {
+						var a = document.createElement('a');
+						while (cur.firstChild) {
+						    //alert(cur.firstChild.tagName + " " + dataConfig.link.text.tag)
+							if (eqStrings(cur.firstChild.tagName, dataConfig.link.ref.tag)) {
+								a.setAttribute('href', cur.firstChild.innerHTML);
+							} else if (eqStrings(cur.firstChild.tagName, dataConfig.link.text.standard) || 
+							             allowedStyle(cur.firstChild.tagName)) {
+								a.innerHTML = cur.firstChild.innerHTML;
+								var styleAttribute = fragStyleToClass(cur.firstChild.tagName);
+								var style = allowedStyle(styleAttribute);
+								if (style) {
+									a.setAttribute('class', style);
+								}
+							}
+							cur.removeChild(cur.firstChild);
+						}
+						root.appendChild(a);
+						node.removeChild(cur);
+					} else {
+						node.removeChild(cur);
+					}
+				}
+			} else {
+				var root = document.createElement('span');
+				root.innerHTML = innerText(node);
+			}
+
+			return root;
+		}
+
 
         /*
 		  Extracts the default content of the editor.
@@ -356,12 +448,12 @@
 
 		/*
 		  Creates a lof of the content of the root argument in accordance
-		  with a HTML style structure.
+		  with a HTML-style structure.
 		*/
-		function logToSpans(root, logger) { // keep that name ???
+		function logToHTML(root, logger) { // keep that name ???
 			var dataConfig = dataStructure.html;
 			for (var i = 0; i < root.childNodes.length; i++) {
-				if (root.childNodes[i].tagName === 'a' && root.childNodes[i].href) {
+				if (eqStrings(root.childNodes[i].tagName, 'a') && root.childNodes[i].href) {
 					logger.openTag(dataConfig.link.tag);
 					if (root.childNodes[i].className) {
 						logger.openAttribute(dataConfig.link.style);
@@ -373,7 +465,7 @@
 					logger.closeAttribute(dataConfig.link.ref);
 					logger.write(root.childNodes[i].textContent);
 					logger.closeTag(dataConfig.link.tag);
-				} else if (root.childNodes[i].tagName === 'span') {
+				} else if (eqStrings(root.childNodes[i].tagName, 'span')) {
 					logger.openTag(dataConfig.standard.tag);
 					if (root.childNodes[i].className) {
 						logger.openAttribute(dataConfig.standard.style);
@@ -393,13 +485,13 @@
 		function logToFragments(root, logger) {
 			var dataConfig = dataStructure.fragments;
 			for (var i = 0; i < root.childNodes.length; i++) {
-				if (root.childNodes[i].tagName === 'a' && root.childNodes[i].href) {
+				if (eqStrings(root.childNodes[i].tagName, 'a') && root.childNodes[i].href) {
 					logger.openTag(dataConfig.link.tag);
 					logger.openTag(dataConfig.link.text.tag);
 					if (root.childNodes[i].className) {
-						logger.openAttribute(dataConfig.link.style);
+						logger.openAttribute(dataConfig.link.text.style);
 						logger.write(classToFragStyle(root.childNodes[i].className));
-						logger.closeAttribute(dataConfig.link.style);
+						logger.closeAttribute(dataConfig.link.text.style);
 					}
 					logger.write(root.childNodes[i].textContent);
 					logger.closeTag(dataConfig.link.text.tag);
@@ -407,7 +499,7 @@
 					logger.write(root.childNodes[i].href);
 					logger.closeTag(dataConfig.link.ref.tag);
 					logger.closeTag(dataConfig.link.tag);
-				} else if (root.childNodes[i].tagName === 'span') {
+				} else if (eqStrings(root.childNodes[i].tagName, 'span')) {
 					logger.openTag(dataConfig.standard.tag);
 					if (root.childNodes[i].className) {
 						logger.openAttribute(dataConfig.standard.style);
@@ -419,6 +511,47 @@
 				}
 			}
 		}
+		
+		/*
+		  Creates a log of the content of the root argument in accordance
+		  with the `semantic' structure.
+		*/		
+		function logToSemantic(root, logger) {
+			var dataConfig = dataStructure.semantic;
+			for (var i = 0; i < root.childNodes.length; i++) {
+				if (eqStrings(root.childNodes[i].tagName, 'a') && root.childNodes[i].href) {
+					logger.openTag(dataConfig.link.tag);
+					
+					if (root.childNodes[i].className) {
+					    var tag = classToFragStyle(root.childNodes[i].className);
+					    logger.openTag(tag);
+						logger.write(root.childNodes[i].textContent);
+						logger.closeTag(tag);
+					} else {
+					    logger.openTag(dataConfig.link.text.standard);
+						logger.write(root.childNodes[i].textContent);
+						logger.closeTag(dataConfig.link.text.standard);
+					}
+					
+					logger.openTag(dataConfig.link.ref.tag);
+					logger.write(root.childNodes[i].href);
+					logger.closeTag(dataConfig.link.ref.tag);
+					
+					logger.closeTag(dataConfig.link.tag);
+				} else if (eqStrings(root.childNodes[i].tagName, 'span')) {
+					if (root.childNodes[i].className) {
+					    var tag = classToFragStyle(root.childNodes[i].className);
+					    logger.openTag(tag);
+						logger.write(root.childNodes[i].textContent);
+						logger.closeTag(tag);
+					} else {
+					    logger.openTag(dataConfig.standard.tag);
+						logger.write(root.childNodes[i].textContent);
+						logger.closeTag(dataConfig.standard.tag);
+					}
+				}
+			}
+		}
 
 		/*
 		  Turns a rich style attribute as a list
@@ -426,7 +559,10 @@
 		  attribute suitable for an HTML element.
 		*/
 		function fragStyleToClass(richStyle) {
-			return richStyle.replace(/_/g, ' ');
+		    if (! richStyle) {
+			    return "";
+			}
+			return richStyle.replace(/_+/g, ' ');
 		}
 
 		/*
@@ -512,7 +648,7 @@
 			sec.sort();
 
 			for (var i = 0; i < pri.length; i++) {
-				if (pri[i] !== sec[i]) {
+				if (! eqStrings(pri[i], sec[i])) {
 					return false;
 				}
 			}
@@ -523,7 +659,7 @@
 		  Whether two nodes have the same tags.
 		*/
 		function equalTags(primus, secundus) {
-			return primus.tagName === secundus.tagName;
+			return eqStrings(primus.tagName, secundus.tagName);
 		}
 
 		/*
@@ -671,6 +807,7 @@
 
 			container.setAttribute('draggable', 'true');
 
+			/* Called when the menu starts being dragged*/
 			function dragStart(ev) {
 				var startRect = container.getBoundingClientRect();
 				_offsetX = parseInt(ev.screenX) - startRect.left;
@@ -682,6 +819,7 @@
 				//console.log(document.outerHTML);
 			}
 
+			/* Called at the end of the drag movement*/
 			function dragEnd(ev) {
 				//console.log('stop')
 				//container.innerHTML = "<span>drop</span>"
@@ -695,10 +833,6 @@
 
 			container.addEventListener('dragstart', function (ev) {dragStart(ev)}, false);
 			container.addEventListener('dragend', function (ev) {dragEnd(ev)}, false);
-			//xtdom.addEventListener(container, 'dragstart', function (ev) {alert('ok'); ; return false;}, false);
-			//xtdom.addEventListener(container, 'dragend', function (ev) {dragEnd(ev)}, false);
-			//xtdom.addEventListener(document, 'drop', function(ev) {drop(ev);}, false);
-
 
 			var buttons = document.createElement('span');//xtdom.createElement(instance.getDocument(), 'span');
 
@@ -734,7 +868,10 @@
 			linkArea.setAttribute('class', 'url-box');
 			container.linkArea = linkArea;
 
-			xtdom.addEventListener(linkArea, 'change', function () {_currentInstance.changeLink(linkArea, this); return false}, false);
+			xtdom.addEventListener(linkArea, 'change', 
+			    function () {
+				    _currentInstance.changeLink(linkArea, this); return false
+				}, false);
 
 			var makeLinkButton = document.createElement('span'); //xtdom.createElement(instance.getDocument(), 'span');
 			var innerLinkButton = document.createElement('button'); //xtdom.createElement(instance.getDocument(), 'button');
@@ -746,8 +883,15 @@
 			makeLinkButton.appendChild(innerLinkButton);
 			makeLinkButton.appendChild(document.createTextNode(' / '));
 			makeLinkButton.appendChild(innerUnlinkButton);
-			xtdom.addEventListener(innerLinkButton, 'click', function () {_currentInstance.makeLink(linkArea, true); return false}, false);
-			xtdom.addEventListener(innerUnlinkButton, 'click', function () {_currentInstance.makeLink(linkArea, false); return false}, false);
+			xtdom.addEventListener(innerLinkButton, 'click', 
+			    function () {
+			        _currentInstance.makeLink(linkArea, true); 
+					return false
+					}, false);
+			xtdom.addEventListener(innerUnlinkButton, 'click', 
+			    function () {
+			        _currentInstance.makeLink(linkArea, false); return false
+					}, false);
 			linkOuter = document.createElement('span');
 			linkArea.value = 'http://...';
 			linkBox = document.createElement('div'); // xtdom.createElement(instance.getDocument(), 'div');
@@ -761,7 +905,10 @@
 			toggleButton.textContent = 'Close';
 			buttons.toggleButton = toggleButton;
 
-			xtdom.addEventListener(toggleButton, 'click', function () {closeButtons();}, false);
+			xtdom.addEventListener(toggleButton, 'click', 
+			    function () {
+				    closeButtons();
+				}, false);
 
 			container.appendChild(buttons);
 			container.appendChild(toggleButton);
@@ -777,8 +924,10 @@
 
 			onInit : function ( aDefaultData, anOptionAttr, aRepeater ) {
 			    checkAndSetParams(this.getDocument());
-				if (this.getParam('lang') === 'span') {
+				if (eqStrings(this.getParam('lang'), 'html')) {
 					var data = extractHTMLContentXT(aDefaultData);
+				} else if (eqStrings(this.getParam('lang'), 'semantic')) {
+				    var data = extractSemanticContentXT(aDefaultData);
 				} else {
 					var data = extractFragmentContentXT(aDefaultData);
 				}
@@ -836,8 +985,10 @@
 					aLogger.discardNodeIfEmpty();
 					return;
 				}
-				if (this._handle && this.getParam('lang') === 'span') {
-					logToSpans(this._handle, aLogger);
+				if (this._handle && eqStrings(this.getParam('lang'), 'html')) {
+					logToHTML(this._handle, aLogger);
+				} else if (this._handle && eqStrings(this.getParam('lang'), 'semantic')) {
+				    logToSemantic(this._handle, aLogger);
 				} else {
 					logToFragments(this._handle, aLogger);
 				}
@@ -850,7 +1001,7 @@
 			api : {
 
 				isFocusable : function () {
-					return this.getParam('noedit') !== 'true';
+					return ! eqStrings(this.getParam('noedit'), 'true');
 				},
 
 				focus : function () {
@@ -912,7 +1063,7 @@
 						//child.addEventListener('click', function(ev) {  _this.clickedFrag(ev); return false;}, true);
 						child.addEventListener('paste', function(ev) {_this.interceptPaste(ev, child); return false;}, true);
 						//child.addEventListener('beforepaste', function(ev) {ev.returnValue = false; return false;}, true);
-						xtdom.addEventListener(child, 'click', function(ev) {  _this.startEditing(ev); return false;}, true);
+						xtdom.addEventListener(child, 'click', function(ev) {  _this.clickedFrag(ev); return false;}, true);
 						//xtdom.addEventListener(child, 'paste', function(ev) {  _this.interceptPaste(ev, child);}, true);
 					}
 				},
@@ -953,7 +1104,7 @@
 					//var text = xtdom.createTextNode(this.getDocument(), content);
 					newNode.textContent = content;
 					//mus in 260  </fragment>,
-					range.insertNode(newNode)
+					range.insertNode(newNode) // could we just insert text here without creating a node ????
 
 					var parent = newNode.parentNode;
 					parent.textContent = innerText(parent);
@@ -1001,7 +1152,7 @@
 				  reshape the tree, in accordance with the desired effect (adding a style,
 				  creating a link, etc.).
 				*/
-				recreateTree : function (root, mainTag, allTagged, inherit, style, link) {
+				recreateTree : function (root, mainTag, allTagged, inherit, style, link, clear) {
 
 					var tempRoot = xtdom.createElement(this.getDocument(), 'span');
 					while (root.firstChild) {
@@ -1018,7 +1169,7 @@
 									newFrag.appendChild(root.firstChild.firstChild);
 									tempRoot.appendChild(newFrag);
 								} else {
-									if (mainTag === 'a' || (href && link)) {
+									if (eqStrings(mainTag, 'a') || (href && link)) {
 										var cur = xtdom.createElement(this.getDocument(), 'a'); // xtdom...
 										cur.setAttribute('href', href);
 									} else {
@@ -1035,6 +1186,9 @@
 										removeClass(cur, style); // is this ever used ??
 										//cur.className = undefined;
 									}
+									if (clear) {
+									    removeAllClasses(cur)
+									}
 									tempRoot.appendChild(cur);
 								}
 							}
@@ -1050,8 +1204,8 @@
 				  any link in the selection (if `link' is false).
 				  
 				  The value of linkArea will be used as target if it conforms to the
-				  pattern of valid urls. Otherwise a warning will pop up and the process
-				  will stop.
+				  pattern of valid urls. Otherwise, a warning will pop up and the process
+				  will stop (the link will not be created).
 				*/
 				makeLink : function (linkArea, link) {
 				
@@ -1088,8 +1242,9 @@
 					var style = "";
 					var allTagged = false;
 					var inherit = false;
+					var clear = false;
 
-					var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, link);
+					var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, link, clear);
 
 					this._handle.innerHTML = "";
 
@@ -1129,10 +1284,12 @@
 					var allTagged = false;
 					var inherit = false;
 					var style = "";
+					var link = true;
+					var clear = true;
 
 					removeAllClasses(newNode);
 
-					var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, true);
+					var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, link, clear);
 
 					this._handle.innerHTML = "";
 
@@ -1171,9 +1328,11 @@
 					} else {
 						var mainTag = 'span';
 					}
+					
+					var link = true;
+                    var clear = false;
 
-
-					var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, true);
+					var tempRoot = this.recreateTree(root, mainTag, allTagged, inherit, style, link, clear);
 
 					this._handle.innerHTML = "";
 
@@ -1182,40 +1341,36 @@
 				},
 
 				
-				/*clickedFrag : function (ev) {
-					xtdom.preventDefault(ev);
+				clickedFrag : function (ev) {
+					ev.returnValue = false;
+					ev.stopPropagation();
+					ev.preventDefault();
 
 					var target = xtdom.getEventTarget(ev);
 					var tag = xtdom.getLocalName(target);
-					if (tag.toUpperCase() === 'A') {
-
+					if (eqStrings(tag, 'A')) {
+						_getBUttons().linkArea.value = target;
+						this.currentLink = target;
+						this._url = target.href;
 					} else {
 						//_buttons.linkArea.value = 'http://...';
-						
+						this.currentLink = null;						
 					}
-					if (ev && this.editInProgress === false) {
+					if (this.editInProgress === false) {
 						this.startEditing(ev);
 					}
-				},*/
+				},
 
 
 				// Starts editing the field (to be called once detected)
 				startEditing : function (ev) {
-					ev.returnValue = false;
-					ev.stopPropagation();
-					ev.preventDefault();
-					
+					var target = xtdom.getEventTarget(ev);
+					var tag = xtdom.getLocalName(target);					
 					if (ev && this.editInProgress == false) {
-						var target = xtdom.getEventTarget(ev);
-						var tag = xtdom.getLocalName(target);
-						if (tag.toUpperCase() === 'A') { // clicked on a link
-						    _getBUttons().linkArea.value = target;
-						    this.currentLink = target;
+						if (eqStrings(tag, 'A')) { // clicked on a link
 							var popupdevice = _getPopupDevice(this.getDocument());
-							this._url = target.href;
 							popupdevice.startEditing(this, ['edit', 'open'], 'edit', target);
 						} else {
-						    this.currentLink = null;
 							this.__open__editor();
 						}
 					}
@@ -1233,7 +1388,7 @@
 						// registers to keyboard events
 						this.kbdHandlers = this.keyboard.register(this, this._handle.parentNode);
 						this.keyboard.grab(this, this);
-						if (this.getParam('multilines') === 'normal') {
+						if (eqStrings(this.getParam('multilines'), 'normal')) {
 							this.keyboard.enableRC(true);
 						} else {
 					        this.keyboard.disableRC(false);
@@ -1268,21 +1423,14 @@
 				stopEditing : function (isCancel) {
 					if ((! this.stopInProgress) && (this.editInProgress !== false)) {
 						this.stopInProgress = true;
-						//_timestamp = -1;
 						this.keyboard.unregister(this, this.kbdHandlers);
 						this.keyboard.release(this, this);
 						xtdom.removeEventListener(this._handle, 'blur', this.blurHandler, false);
-						if (!isCancel) {
-							// user may have deleted all
-							// FIXME: we should also normalize in case of a paste that created garbage (like some <br/>)
-							this.update(this._handle.firstChild ? this._handle.firstChild.data : null);
-						} else {
-							// restores previous data model - do not call _setData because its like if there was no input validated
-							if (this._handle.firstChild) {
-								this._handle.firstChild.data = this.model;
-							}
+						if (isCancel) {
+							// restores previous data model
+						    this._setData(this.getDefaultData());
 						}
-						this._handle.blur();
+						//this._handle.blur();
 						//        xtdom.addClassName(this._handle, 'axel-core-editable');
 						this.stopInProgress = false;
 						this.editInProgress = false;
@@ -1296,11 +1444,6 @@
 						this.setListeners();
 					}
 
-				},
-
-				// Updates the editor data model with the given data
-				// This gives a chance to normalize the input
-				update : function (aData) {
 				},
 
 				// Clears the model and sets its data to the default data.
@@ -1330,6 +1473,3 @@
 	_Editor
 	);
 }($axel));
-
-
- xtiger.resources.addBundle('richcontent', { 'params' : 'richcontentparams.js' } );
