@@ -14,8 +14,6 @@
 
 (function ($axel) {
 
-   // Mention the issue with the listeners
-
 	/*
 	 Creates the editor's handle. By default, the handle will be a `span', but
 	 other choices are possible, such as `pre' if the multilines option is
@@ -31,7 +29,6 @@
 		var t = xtdom.createTextNode(aDocument, '');
 		handle.appendChild(t);
 		xtdom.addClassName(handle, 'axel-core-on');
-		var span = xtdom.createElement(aDocument, 'span');
 		aContainer.appendChild(handle);
 		return handle;
 	};
@@ -44,18 +41,8 @@
 		*/
 		var urlPattern = new RegExp(/[-a-zA-Z0-9@:%_\+.~#?&//=]{2,}\.[a-z]{2,}\b(\/[-a-zA-Z0-9@:%_\+.~#?&//=]*)?/gi);
 
-		//var _timestamp = -1;
-
-		/*function _focusAndSelect ( editor ) {
-	// pre-condition: the editor's handle must already have focus
-	try {
-		editor.getDocument().execCommand('selectAll', false, ''); // FIXME: fails on iPad
-	}
-	catch (e) { }
-	}*/
-
 		/* 
-		  The format names as displayed on the buttons and their corresponding CSS span.class
+		  The default format names as displayed on the buttons and their corresponding CSS classes.
 		*/
 		var formatsAndCSS = [
 			{name : 'Bold', style : 'bold'},
@@ -65,16 +52,20 @@
 		];
 		
         /*
-		  The default structure of the data to be loaded and saved. Two main structures should 
-		  be defined. In the html-like structure, links are represented as nodes (by default with a
+		  The default structure of the data to be loaded and saved. three main structures are defined. 
+		  
+		  In the html-like structure, links are represented as nodes (by default with a
 		  `a' tag) parents to some text content and bearing a target attribute (by default, a
-		  `href'). In the `fragment' case, links are parents to two nodes: a `text'-tagged
-		  node containing some text child, and a `ref' child containing the target url. In both
-		  cases, the text can be qualified by a style attribute.
+		  `href'). The other elements are spans.
+		  
+		  In the `fragment' case, links are parents to two nodes: a `text'-tagged node 
+		  containing some text child, and a `ref' child containing the target url. The
+		  other nodes have tagged corresponding to the `standard' attribute. The link.text and
+          the standard nodes can be qualified by a style attribute.
 		  
 		  The `semantic' structure is to be defined by the user with its own categories. The node 
 		  tags themselves will serve as formats (provided they are among the allowed CSS recognized
-		  by the editor). 
+		  by the editor). The links assume a pattern similar to the fragment-type links.
 		  
           The structure defined here-below, as well as in formatsAndCSS, represent the default
 		  choices. The user can redefine them in the associated file richcontentparams.js (quae
@@ -99,7 +90,7 @@
 		 Extracts the formats used by the editor, as defined in formatsAndCSS
 		*/
 		function _formats(formatsAndCSS) {
-			var ret = []
+			var ret = [];
 			for (var i = 0; i < formatsAndCSS.length; i++) {
 				ret.push(formatsAndCSS[i].style);
 			}
@@ -112,7 +103,7 @@
 		var allowedCSS = _formats(formatsAndCSS);
 		
 		/*
-		  Check for String equality irrespective of their case.
+		  Checks for String equality irrespective of the case.
 		  I.e. eqStrings("a", "a") and eqStrings("A", "a") should be true,
 		  while eqStrings("a", "b") and eqStrings("A", "b") should be false.
 		*/
@@ -127,12 +118,17 @@
 		/*
 		  Checks whether parameters different from the default ones have been
 		  attached to the main window (see richcontentparams.js for an example).
-		  If this is the case the relevant parameters will be applied in lieu of 
+		  If this is the case, the relevant parameters will be applied in lieu of 
 		  the default ones.
 		*/
 		function checkAndSetParams(doc) {
 			var win = doc.defaultView || doc.parentWindow; 
 	        var axelParamsRichContent = win ? win.axelParams ? win.axelParams['richContent'] : null : null;
+			
+			if (! axelParamsRichContent) {
+			    return;
+			}
+			
 		    if (axelParamsRichContent.formatsAndCSS) {
 			    formatsAndCSS = axelParamsRichContent.formatsAndCSS;
 				allowedCSS = _formats(formatsAndCSS);
@@ -153,17 +149,17 @@
 
 		/*
 		  Whether some style (i.e. some string containing a sequence of CSS 
-		  classes separated by spaces) is recognized by the
-          editor. 
+		  classes separated by spaces) is recognized by the editor. 
 		  
-		  The return value is a string of allowed CSS classes separated by spaces.
+		  The return value is a string of those classes mentioned in the parameter
+		  that are allowed, separated by spaces.
         */		  
 		function allowedStyle(style) {
 			if (!style) {
 				return null;
 			}
 
-			var splits = style.split(/ /); // we should allow for several spaces !!!!
+			var splits = style.split(/\s+/);
 			var ret = [];
 			for (var i = 0; i < splits.length; i++) {
 				if (allowedCSS.indexOf(splits[i]) !== -1) {
@@ -188,7 +184,7 @@
 		};
 
 		/*
-		  Returns the text content of some parent node, rid of any
+		  Returns the text content of some parent node, cleaned of any
 		  HTML tag. The individual text pieces of the leaves are
 		  concatenated together into a single string.
 		*/
@@ -202,7 +198,7 @@
 				}
 				return ret;
 			} else {
-				return ""
+				return "";
 			}
 		}
 		
@@ -211,7 +207,6 @@
 		  with their safe equivalents.
 		*/
 		function escapeHTMLchars(str) {
-		    return str;
 			var cleaned = [];
 			var arr = str.split("");
 			for (var i = 0; i < arr.length; i++) {
@@ -231,7 +226,7 @@
 				default: res = cur;
 					break;
 				}
-				cleaned.push(res)
+				cleaned.push(res);
 			}               
 			return cleaned.join('');
 		}
@@ -251,8 +246,7 @@
 				}
 			}
 			
-
-			if (node.childNodes) {
+			if (node.firstChild) {
 				var root = document.createElement('span');
 				var cur;
 				while (node.firstChild) {
@@ -263,7 +257,7 @@
 						var styleAttribute = fragStyleToClass(cur.getAttribute(dataConfig.standard.style));
 						var style = allowedStyle(styleAttribute);
 						if (style) {
-							span.setAttribute('class', style);
+							xtdom.setAttribute(span, 'class', style);
 						}
 						node.removeChild(cur);
 						root.appendChild(span);
@@ -271,13 +265,13 @@
 						var a = document.createElement('a');
 						while (cur.firstChild) {
 							if (eqStrings(cur.firstChild.tagName, dataConfig.link.ref.tag)) {
-								a.setAttribute('href', cur.firstChild.innerHTML);
+								xtdom.setAttribute(a, 'href', cur.firstChild.innerHTML);
 							} else if (eqStrings(cur.firstChild.tagName, dataConfig.link.text.tag)) {
-								a.innerHTML = cur.firstChild.innerHTML;
+								a.innerHTML = innerText(cur.firstChild);
 								var styleAttribute = fragStyleToClass((cur.getAttribute(dataConfig.standard.style)));
 								var style = allowedStyle(styleAttribute);
 								if (style) {
-									a.setAttribute('class', style);
+									xtdom.setAttribute(a, 'class', style);
 								}
 							}
 							cur.removeChild(cur.firstChild);
@@ -290,7 +284,9 @@
 				}
 			} else {
 				var root = document.createElement('span');
-				root.innerHTML = innerText(node);
+				var singleFrag = document.createElement('span');
+				singleFrag.textContent = innerText(node);
+				root.appendChild(singleFrag);
 			}
 
 			return root;
@@ -310,7 +306,7 @@
 				}
 			}
 
-			if (node.childNodes) {
+			if (node.firstChild) {
 				var root = document.createElement('span');
 				var cur;
 				while (node.firstChild) {
@@ -320,17 +316,17 @@
 						span.innerHTML = innerText(cur);
 						var style = allowedStyle(cur.getAttribute(dataConfig.standard.style));
 						if (style) {
-							span.setAttribute('class', style);
+							xtdom.setAttribute(span, 'class', style);
 						}
 						node.removeChild(cur);
 						root.appendChild(span);
-					} else  if (cur.nodeType === xtdom.ELEMENT_NODE && eqStrings(cur.tagName, dataConfig.link.tag)) {
+					} else if (cur.nodeType === xtdom.ELEMENT_NODE && eqStrings(cur.tagName, dataConfig.link.tag)) {
 						var a = document.createElement('a');
-						a.setAttribute('href', cur.getAttribute(dataConfig.link.ref));
+						xtdom.setAttribute(a, 'href', cur.getAttribute(dataConfig.link.ref));
 						a.innerHTML = innerText(cur);
 						var style = allowedStyle(cur.getAttribute(dataConfig.standard.style));
 						if (style) {
-							a.setAttribute('class', style);
+							xtdom.setAttribute(a, 'class', style);
 						}
 						node.removeChild(cur);
 						root.appendChild(a);
@@ -340,7 +336,9 @@
 				}
 			} else {
 				var root = document.createElement('span');
-				root.innerHTML = innerText(node);
+				var singleFrag = document.createElement('span');
+				singleFrag.textContent = innerText(node);
+				root.appendChild(singleFrag);
 			}
 
 			return root;
@@ -360,10 +358,8 @@
 					return null;
 				}
 			}
-			
-			//alert(node)
 
-			if (node.childNodes) {
+			if (node.firstChild) {
 				var root = document.createElement('span');
 				var cur;
 				while (node.firstChild) {
@@ -375,23 +371,22 @@
 						var styleAttribute = fragStyleToClass(cur.tagName);
 						var style = allowedStyle(styleAttribute);
 						if (! eqStrings(style, dataConfig.standard.tag)) {
-							span.setAttribute('class', style);
+							xtdom.setAttribute(span, 'class', style);
 						}
 						node.removeChild(cur);
 						root.appendChild(span);
 					} else if (cur.nodeType === xtdom.ELEMENT_NODE && eqStrings(cur.tagName, dataConfig.link.tag)) {
 						var a = document.createElement('a');
 						while (cur.firstChild) {
-						    //alert(cur.firstChild.tagName + " " + dataConfig.link.text.tag)
 							if (eqStrings(cur.firstChild.tagName, dataConfig.link.ref.tag)) {
-								a.setAttribute('href', cur.firstChild.innerHTML);
+								xtdom.setAttribute(a, 'href', cur.firstChild.innerHTML);
 							} else if (eqStrings(cur.firstChild.tagName, dataConfig.link.text.standard) || 
 							             allowedStyle(cur.firstChild.tagName)) {
-								a.innerHTML = cur.firstChild.innerHTML;
+								a.innerHTML = innerText(cur.firstChild);
 								var styleAttribute = fragStyleToClass(cur.firstChild.tagName);
 								var style = allowedStyle(styleAttribute);
 								if (style) {
-									a.setAttribute('class', style);
+									xtdom.setAttribute(a, 'class', style);
 								}
 							}
 							cur.removeChild(cur.firstChild);
@@ -404,7 +399,9 @@
 				}
 			} else {
 				var root = document.createElement('span');
-				root.innerHTML = innerText(node);
+				var singleFrag = document.createElement('span');
+				singleFrag.textContent = innerText(node);
+				root.appendChild(singleFrag);
 			}
 
 			return root;
@@ -414,25 +411,10 @@
         /*
 		  Extracts the default content of the editor.
 		  This is a hack to replace the standard default method of the same
-		  name in xtdom, as it removes any tag.
+		  name in xtdom, as the latter removes any tag.
 		*/
 		xtdom.extractDefaultContentXT = function (node) {
 			return node;
-		}
-
-        /*
-		  Regularizes the content
-		*/
-		// Test whether this is useful
-		function normalize(content, doc) {
-			// TODO should normalize ill-formed data as much as possible
-
-			if (typeof content === typeof 'abc') {
-				var span = xtdom.createElement(doc, 'span');
-				span.innerHTML = content;
-				return span;
-			}
-			return content;
 		}
 
 		/*
@@ -443,14 +425,12 @@
 		function classToFragStyle(className) {
 			return className.replace(/\s+/g, '_');
 		}
-		
-		// Check that the span and fragments style use the correct style attributes...
 
 		/*
-		  Creates a lof of the content of the root argument in accordance
+		  Creates a log of the content of the root argument in accordance
 		  with a HTML-style structure.
 		*/
-		function logToHTML(root, logger) { // keep that name ???
+		function logToHTML(root, logger) { 
 			var dataConfig = dataStructure.html;
 			for (var i = 0; i < root.childNodes.length; i++) {
 				if (eqStrings(root.childNodes[i].tagName, 'a') && root.childNodes[i].href) {
@@ -566,14 +546,14 @@
 		}
 
 		/*
-		  Whether a node bears a class or descends from a 
-		  node bearing this class.
+		  Whether a node is endowed with a class or descends from a 
+		  node endowed with it.
 		*/
 		function inheritClass(node, className) {
 			if (hasClass(node, className)) {
 				return true;
 			} else if (! node.parentNode) {
-				return false
+				return false;
 			} else {
 				return inheritClass(node.parentNode, className);
 			}
@@ -592,8 +572,7 @@
 		}
 
 		/*
-		  Whether all the children of some node bear some
-		  class.
+		  Whether all the children of some node have some class.
 		*/
 		function allChildrenTagged(node, className) {
 			for (var i = 0; i < node.childNodes.length; i++) {
@@ -605,7 +584,7 @@
 		}
 
 		/*
-		  Adds a CSS class to the class attribute some node.
+		  Adds a CSS class to the class attribute of a given node.
 		*/
 		function addClass(node, className) {
 			if (! className) {
@@ -665,6 +644,9 @@
 		/*
 		  Whether a node is a `a' element or descends from
 		  such element.
+		  
+		  If true, returns the value of the 'href' attribute,
+		  otherwise returns null;
 		*/
 		function inLink(node) {
 			if (node.href) {
@@ -677,7 +659,7 @@
 		}
 
 		/*
-		  Removes all classes from a node
+		  Removes all classes from a node and its descendants.
 		*/
 		function removeAllClasses(node) {
 			if (node.nodeType === xtdom.TEXT_NODE) {
@@ -700,13 +682,14 @@
 		function createModal() {
 			// Creation of a modal to display warnings
 			var div = document.createElement('div');
-			div.setAttribute('class', 'modal');
+			xtdom.setAttribute(div, 'class', 'modal');
 			div.style.display = 'none';
 			return div;
 		}
 
 		/*
-		  Displays the modal over the current editable field.
+		  Displays the modal over the current editable field,
+		  with `text' as its content.
 		  The field is made non-editable as long as the modal
 		  is visible. The modal can be closed by clicking it.
 		*/
@@ -725,16 +708,17 @@
 			_modal.style.top = top + 'px';
 			_modal.style.left = left + 'px';
 			xtdom.addEventListener(_modal, 'click',
-			function(ev) {
-				_modal.style.display='none';
-				setEditable(instance, 'true');
-			});
+				function(ev) {
+					_modal.style.display='none';
+					_modal.parentNode.removeChild(_modal);
+					setEditable(instance, 'true');
+				});
 		}
 
 		/*
-		  The menu holding the buttons and the link editing area
+		  The menu holding the buttons and the link-editing area.
 	    */
-		var _buttons = null; // keep that name ??
+		var _buttons = null;
 		
 		/*
 		  Hides the menu.
@@ -763,7 +747,7 @@
 		/*
 		  A reference to the currently editable field. 
 		  We assume only one field on the page can be edited at
-		  a time. Any action on the field will be applied to
+		  a time. Any action on the menu will be applied to
 		  its elements.
 		*/
 		var _currentInstance = null;
@@ -773,10 +757,11 @@
 		*/
 		function registerEditor(instance) {
 			_currentInstance = instance;
-			//_buttons.linkArea.value = 'http://...';
 			instance.buttons = _getBUttons();
 			var buttons = instance.getDocument().adoptNode(_getBUttons()); // necessary on IE
-			instance._handle.parentNode.appendChild(buttons);
+			instance.getDocument().body.style.position = 'absolute';
+			instance.getDocument().body.appendChild(buttons);
+			xtdom.setAttribute(buttons.linkBox, 'style', 'min-width: ' + (buttons.linkBox.offsetWidth + 5) + 'px');
 		}
 
 		/*
@@ -784,65 +769,58 @@
 		*/
 		function setEditable(instance, value) {
 			xtdom.setAttribute(instance._handle, 'contenteditable', value);
-			// For some reason, the paste works only occasionally when the parent node is not
-			// set to be content editable.
-			xtdom.setAttribute(instance._handle.parentNode, 'contenteditable', value);
 		}
 
 		/*
 		  Creates the menu. 
 		  
 		  This is a div node, with a list of buttons matching the definitions in
-		  formatsAndCSS plus a `clear' button. The menu also contains a link edition
+		  formatsAndCSS plus a `clear' button. The menu also contains a link-edition
 		  area and a `close' button to hide it.
 		*/
 		function createButtons() {
 
-			var container = document.createElement('div');//xtdom.createElement(instance.getDocument(), 'span');
-			container.setAttribute('class', 'buttons-container');
-			container.setAttribute('contenteditable', 'false');
+			var container = document.createElement('div');
+			xtdom.setAttribute(container, 'class', 'buttons-container');
 
 			var _offsetX = 0;
 			var _offsetY = 0;
 
-			container.setAttribute('draggable', 'true');
+			xtdom.setAttribute(container, 'draggable', 'true');
+			container.style.position = 'fixed';
 
-			/* Called when the menu starts being dragged*/
+			// Called when the menu starts being dragged
 			function dragStart(ev) {
 				var startRect = container.getBoundingClientRect();
 				_offsetX = parseInt(ev.screenX) - startRect.left;
 				_offsetY = parseInt(ev.screenY) - startRect.top;
-				//console.log(_offsetX + " " + _offsetY + " " + parseInt(ev.clientX) + " " + parseInt(ev.clientY))
 				ev.dataTransfer.effectsAllowed = "copy";
 				ev.dataTransfer.setData('text', "");
-				console.log('start')
-				//console.log(document.outerHTML);
 			}
 
-			/* Called at the end of the drag movement*/
+			// Called at the end of the drag movement
 			function dragEnd(ev) {
-				//console.log('stop')
-				//container.innerHTML = "<span>drop</span>"
-				//ev.stopPropagation();
-				var left = (parseInt(ev.screenX) - _offsetX) + 'px';
-				var top = (parseInt(ev.screenY) - _offsetY) + 'px';
-				//console.log(_offsetX + " " + _offsetY + " " + ev.screenX + " " + ev.screenY)
+			    var width = container.getBoundingClientRect().right - container.getBoundingClientRect().left;
+				var height = container.getBoundingClientRect().bottom - container.getBoundingClientRect().top;
+			    //alert(window.innerHeight + " " + container.getBoundingClientRect().bottom + " " + height)
+				var left = Math.min(window.innerWidth - (width/2), Math.max(0, parseInt(ev.screenX) - _offsetX)) + 'px';
+				var top = Math.max(0, Math.min(window.innerHeight - height, parseInt(ev.screenY) - _offsetY)) + 'px';
 				container.style.left = left;
 				container.style.top = top;
+				//alert(window.innerHeight + " " + container.getBoundingClientRect().top + " " + height)
 			}
 
 			container.addEventListener('dragstart', function (ev) {dragStart(ev)}, false);
 			container.addEventListener('dragend', function (ev) {dragEnd(ev)}, false);
 
-			var buttons = document.createElement('span');//xtdom.createElement(instance.getDocument(), 'span');
-
+			var buttons = document.createElement('span');
 
 			for (var i = 0; i < formatsAndCSS.length; i++) {
-				var button = document.createElement('button');//xtdom.createElement(instance.getDocument(), 'button');
-				button.setAttribute('class', 'button-as-links');
-				var inner = document.createElement('span'); //xtdom.createElement(instance.getDocument(), 'span');
+				var button = document.createElement('button');
+				xtdom.setAttribute(button, 'class', 'button-as-links');
+				var inner = document.createElement('span');
 				var style = formatsAndCSS[i].style;
-				inner.setAttribute('class', style);
+				xtdom.setAttribute(inner, 'class', style);
 				inner.textContent = formatsAndCSS[i].name;
 				button.appendChild(inner);
 				buttons.appendChild(button);
@@ -856,29 +834,44 @@
 				xtdom.addEventListener(button, 'click', callToEnrich(style), false);
 			}
 
-			var clearButton = document.createElement('button');//xtdom.createElement(instance.getDocument(), 'button');
-			clearButton.setAttribute('class', 'button-as-links');
-			var inner = document.createElement('span'); //xtdom.createElement(instance.getDocument(), 'span');
+			var clearButton = document.createElement('button');
+			xtdom.setAttribute(clearButton, 'class', 'button-as-links');
+			var inner = document.createElement('span');
 			inner.textContent = 'Clear';
 			clearButton.appendChild(inner);
 			buttons.appendChild(clearButton);
 			xtdom.addEventListener(clearButton, 'click', function() {_currentInstance.clearRange()}, false);
 
-			var linkArea = document.createElement('textarea'); //xtdom.createElement(instance.getDocument(), 'textarea');
-			linkArea.setAttribute('class', 'url-box');
+			var linkArea = document.createElement('textarea');
+			xtdom.setAttribute(linkArea, 'class', 'url-box');
 			container.linkArea = linkArea;
+			
+			/*
+			  For some reason (probably a bug), textareas become non-editable in Firefox when
+			  inside a 'draggable' element. We thus have to remove the attribute when the
+			  user wants to interact with linkArea, and add it back when the mouse leaves the
+			  object. Perhaps these event listeners could be removed when Firefox gets fixed...
+			*/
+			xtdom.addEventListener(linkArea, 'mouseover', 
+			    function () {
+				    container.removeAttribute('draggable');
+				}, false);
+			xtdom.addEventListener(linkArea, 'mouseout', 
+			    function () {
+				    container.setAttribute('draggable', 'true');
+				}, false);
 
 			xtdom.addEventListener(linkArea, 'change', 
 			    function () {
 				    _currentInstance.changeLink(linkArea, this); return false
 				}, false);
 
-			var makeLinkButton = document.createElement('span'); //xtdom.createElement(instance.getDocument(), 'span');
-			var innerLinkButton = document.createElement('button'); //xtdom.createElement(instance.getDocument(), 'button');
-			innerLinkButton.setAttribute('class', 'button-as-links');
+			var makeLinkButton = document.createElement('span');
+			var innerLinkButton = document.createElement('button');
+			xtdom.setAttribute(innerLinkButton, 'class', 'button-as-links');
 			innerLinkButton.textContent = 'Link';
-			var innerUnlinkButton = document.createElement('button'); //xtdom.createElement(instance.getDocument(), 'button');
-			innerUnlinkButton.setAttribute('class', 'button-as-links');
+			var innerUnlinkButton = document.createElement('button');
+			xtdom.setAttribute(innerUnlinkButton, 'class', 'button-as-links');
 			innerUnlinkButton.textContent = 'Unlink';
 			makeLinkButton.appendChild(innerLinkButton);
 			makeLinkButton.appendChild(document.createTextNode(' / '));
@@ -894,14 +887,15 @@
 					}, false);
 			linkOuter = document.createElement('span');
 			linkArea.value = 'http://...';
-			linkBox = document.createElement('div'); // xtdom.createElement(instance.getDocument(), 'div');
+			linkBox = document.createElement('div');
 			linkOuter.appendChild(linkArea);
 			linkBox.appendChild(linkOuter);
 			linkBox.appendChild(makeLinkButton);
 			buttons.appendChild(linkBox);
+			container.linkBox = linkBox;
 
-			var toggleButton = document.createElement('button'); //xtdom.createElement(instance.getDocument(), 'span');
-			toggleButton.setAttribute('class', 'button-as-links');
+			var toggleButton = document.createElement('button');
+			xtdom.setAttribute(toggleButton, 'class', 'button-as-links');
 			toggleButton.textContent = 'Close';
 			buttons.toggleButton = toggleButton;
 
@@ -931,7 +925,7 @@
 				} else {
 					var data = extractFragmentContentXT(aDefaultData);
 				}
-				var data = normalize(data, this.getDocument());
+				
 				if (! data) {
 					this._content = '<span>Click to edit</span>'; // should make a function to ensure proper structure of the content
 				} else {
@@ -947,33 +941,27 @@
 
 			// Awakes the editor to DOM's events, registering the callbacks for them
 			onAwake : function () {
-				var _this = this;
 				if (this.getParam('noedit') !== 'true') {
 					xtdom.addClassName(this._handle, 'axel-core-editable');
-					// 'mousedown' always preceeds 'focus', saves shiftKey timestamp to detect it in forthcoming 'focus' event
-					//xtdom.addEventListener(this._handle, 'mousedown', function(ev) { if (ev.shiftKey) { _timestamp = new Date().getTime(); } }, true);
-					// tracks 'focus' event in case focus is gained with tab navigation  (no shiftKey)
 					this.setListeners();
-					/*if (xtiger.cross.UA.gecko) {  // gecko: prevent browser from selecting contentEditable parent in triple clicks !
-			xtdom.addEventListener(this._handle, 'mousedown', function(ev) { if (ev.detail >= 3) { xtdom.preventDefault(ev);xtdom.stopPropagation(ev);_this._handle.focus();_focusAndSelect(_this); } }, true);
-		}
-		if (xtiger.cross.UA.webKit) {
-			this.doSelectAllCb = function () { _focusAndSelect(_this); }; // cache function
-		}*/
-					// TODO: instant paste cleanup by tracking 'DOMNodeInserted' and merging each node inserted ?
 				}
-				this.blurHandler = function (ev) { _this.handleBlur(ev); };
 			},
 
 			onLoad : function (aPoint, aDataSrc) {
-				var _value, _default;
 				if (aPoint !== -1) {
-					_value = normalize(aPoint[0], this.getDocument());
-					_default = this.getDefaultData();
-					defval = _value || _default;
+					if (eqStrings(this.getParam('lang'), 'html')) {
+						var _value = extractHTMLContentXT(aPoint[0]);
+					} else if (eqStrings(this.getParam('lang'), 'semantic')) {
+						var _value = extractSemanticContentXT(aPoint[0]);
+					} else {
+						var _value = extractFragmentContentXT(aPoint[0]);
+					}
+					var _default = this.getDefaultData();
+					var defval = _value || _default;
 					this._setData(defval);
 					this.setModified(_value !==  _default);
 					this.set(false);
+					this.setListeners();
 				} else {
 					this.clear(false);
 				}
@@ -1027,7 +1015,7 @@
 				// Sets editor model value. Takes the handle and updates its DOM content.
 				_setData : function (aData) {
 
-					while (this._handle.firstChild) { //is there a remove-all-children function ??
+					while (this._handle.firstChild) {
 						this._handle.removeChild(this._handle.firstChild);
 					}
 					while (aData.firstChild) {
@@ -1056,15 +1044,15 @@
 				doKeyUp : function (ev) {
 				},
 
+				/*
+				  Sets listeners on the handle's children to wait for mouse clicks.
+				*/
 				setListeners : function () {
 					var _this = this;
 					for (var i = 0; i < this._handle.children.length; i++) {
 						var child = this._handle.children[i];
-						//child.addEventListener('click', function(ev) {  _this.clickedFrag(ev); return false;}, true);
 						child.addEventListener('paste', function(ev) {_this.interceptPaste(ev, child); return false;}, true);
-						//child.addEventListener('beforepaste', function(ev) {ev.returnValue = false; return false;}, true);
 						xtdom.addEventListener(child, 'click', function(ev) {  _this.clickedFrag(ev); return false;}, true);
-						//xtdom.addEventListener(child, 'paste', function(ev) {  _this.interceptPaste(ev, child);}, true);
 					}
 				},
 
@@ -1079,8 +1067,8 @@
 				interceptPaste : function (event, node) {
 					//xtdom.preventDefault(event); // something seems not to work here...
 					event.returnValue = false;
-					event.stopPropagation();
-					event.preventDefault();
+					if (event.stopPropagation) {event.stopPropagation();}
+					if (event.preventDefault) {event.preventDefault();}
 
 					var winText = window.clipboardData ? window.clipboardData.getData("Text") : "";
 					var eventText = event.clipboardData ? event.clipboardData.getData('text') : "";
@@ -1096,15 +1084,13 @@
 					}
 
 					//content = escapeHTMLchars(content);
-					//alert(content)
 
 					var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
 
 					var newNode = xtdom.createElement(this.getDocument(), 'span');
-					//var text = xtdom.createTextNode(this.getDocument(), content);
 					newNode.textContent = content;
 					//mus in 260  </fragment>,
-					range.insertNode(newNode) // could we just insert text here without creating a node ????
+					range.insertNode(newNode)
 
 					var parent = newNode.parentNode;
 					parent.textContent = innerText(parent);
@@ -1114,8 +1100,8 @@
 				},
 
 				/*
-				  Creates a simplified and regularized version of a tree with current
-				  as its root and roots it in the target node.
+				  Creates a simplified and regularized version of a tree with `current'
+				  as its root and roots it in the `target' node.
 				  
 				  The editing and pasting operations tend to complicate the structure of the handle
 				  by introducing empty subnodes or sequences of nodes bearing the same attributes.
@@ -1151,6 +1137,17 @@
 				  caused by the edition disturbs that structure. This method will
 				  reshape the tree, in accordance with the desired effect (adding a style,
 				  creating a link, etc.).
+				  
+				  @param root: the root of the tree to be reshaped.
+				  @param mainTag: `a' when the selection should be turned into a link, 
+				                  `span' if it should be an ordinary node.
+				  @param allTagged: whether all the children of the inserted node bear the
+				                    new style.
+				  @param inherit: whether the inserted node is inside a node with the
+				                  required style.
+				  @param link: whether the selection should be turned into a link (if true)
+				               or turned into a span (if false).
+				  @param clear: whether the selection should be cleared of any style.
 				*/
 				recreateTree : function (root, mainTag, allTagged, inherit, style, link, clear) {
 
@@ -1161,19 +1158,19 @@
 								var href = inLink(root.firstChild.firstChild);
 								var tag = href ? 'a' : 'span';
 								if (root.firstChild.firstChild.nodeType === xtdom.TEXT_NODE) {
-									var newFrag = xtdom.createElement(this.getDocument(), tag); // xtdom...
+									var newFrag = xtdom.createElement(this.getDocument(), tag);
 									if (href) {
-										newFrag.setAttribute('href', href);
+										xtdom.setAttribute(newFrag, 'href', href);
 									}
 									addClass(newFrag, root.firstChild.className);
 									newFrag.appendChild(root.firstChild.firstChild);
 									tempRoot.appendChild(newFrag);
 								} else {
 									if (eqStrings(mainTag, 'a') || (href && link)) {
-										var cur = xtdom.createElement(this.getDocument(), 'a'); // xtdom...
-										cur.setAttribute('href', href);
+										var cur = xtdom.createElement(this.getDocument(), 'a');
+										xtdom.setAttribute(cur, 'href', href);
 									} else {
-										var cur = xtdom.createElement(this.getDocument(), 'span'); // xtdom...
+										var cur = xtdom.createElement(this.getDocument(), 'span');
 									}
 									cur.innerHTML = root.firstChild.firstChild.innerHTML;
 									addClass(cur, root.firstChild.className);
@@ -1209,7 +1206,6 @@
 				*/
 				makeLink : function (linkArea, link) {
 				
-				    // We should check whether the user is trying to unlink a non-link or vice-versa
 					var url = linkArea.value;
 					if (url.indexOf('http://') != 0 && url.indexOf('https://') != 0) {
 						url = 'http://' + url;
@@ -1220,23 +1216,19 @@
 						return;
 					}
 
-					if (link) {
-						var mainTag = 'a';
-					} else {
-						var mainTag = 'span';
-					}
-
 					var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
 					var newNode = xtdom.createElement(this.getDocument(), mainTag);
-					var content = range.extractContents()
-					newNode.appendChild(content)
-					range.insertNode(newNode)
+					var content = range.extractContents();
+					newNode.appendChild(content);
+					range.insertNode(newNode);
 
 					var root = this._handle;
 
 					if (link) {
 						var mainTag = 'a';
-						newNode.setAttribute('href', url);
+						xtdom.setAttribute(newNode, 'href', url);
+					} else {
+						var mainTag = 'span';
 					}
 
 					var style = "";
@@ -1261,15 +1253,15 @@
 				},
 
 				/*
-				  Clears the selected range from any style.
+				  Clears the selected range of any style.
 				*/
 				clearRange : function () {
 
 					var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
 
 					var newNode = xtdom.createElement(this.getDocument(), 'span');
-					var content = range.extractContents()
-					newNode.appendChild(content)
+					var content = range.extractContents();
+					newNode.appendChild(content);
 
 					range.insertNode(newNode);
 
@@ -1304,8 +1296,8 @@
 					var range = xtdom.getWindow(this.getDocument()).getSelection().getRangeAt(0);
 
 					var newNode = xtdom.createElement(this.getDocument(), 'span');
-					var content = range.extractContents()
-					newNode.appendChild(content)
+					var content = range.extractContents();
+					newNode.appendChild(content);
 
 					range.insertNode(newNode);
 
@@ -1340,11 +1332,13 @@
 
 				},
 
-				
+				/*
+				  Reacts to a mouse click on the handles' children.
+				*/
 				clickedFrag : function (ev) {
 					ev.returnValue = false;
-					ev.stopPropagation();
-					ev.preventDefault();
+					if (ev.stopPropagation) {ev.stopPropagation();}
+					if (ev.preventDefault) {ev.preventDefault();}
 
 					var target = xtdom.getEventTarget(ev);
 					var tag = xtdom.getLocalName(target);
@@ -1353,7 +1347,6 @@
 						this.currentLink = target;
 						this._url = target.href;
 					} else {
-						//_buttons.linkArea.value = 'http://...';
 						this.currentLink = null;						
 					}
 					if (this.editInProgress === false) {
@@ -1362,7 +1355,9 @@
 				},
 
 
-				// Starts editing the field (to be called once detected)
+				/*
+				  Starts editing the field.
+				*/
 				startEditing : function (ev) {
 					var target = xtdom.getEventTarget(ev);
 					var tag = xtdom.getLocalName(target);					
@@ -1393,17 +1388,6 @@
 						} else {
 					        this.keyboard.disableRC(false);
 						}
-						//        xtdom.removeClassName(this._handle, 'axel-core-editable');
-							/*if ((!this.isModified()) || ((_timestamp !== -1) && ((_timestamp - new Date().getTime()) < 100))) {
-							if (xtiger.cross.UA.webKit) {
-								// it seems on webkit the contenteditable will really be focused after callbacks return
-								setTimeout(this.doSelectAllCb, 100);
-							} else {
-								_focusAndSelect(this);
-							}
-							}*/
-						// must be called at the end as on FF 'blur' is triggered when grabbing
-						xtdom.addEventListener(this._handle, 'blur', this.blurHandler, false);
 					}
 				},
 
@@ -1419,19 +1403,18 @@
 					}
 				},
 
-				// Stops the edition process on the device
+				/*
+				  Stops the edition process.
+				*/
 				stopEditing : function (isCancel) {
 					if ((! this.stopInProgress) && (this.editInProgress !== false)) {
 						this.stopInProgress = true;
 						this.keyboard.unregister(this, this.kbdHandlers);
 						this.keyboard.release(this, this);
-						xtdom.removeEventListener(this._handle, 'blur', this.blurHandler, false);
 						if (isCancel) {
 							// restores previous data model
 						    this._setData(this.getDefaultData());
 						}
-						//this._handle.blur();
-						//        xtdom.addClassName(this._handle, 'axel-core-editable');
 						this.stopInProgress = false;
 						this.editInProgress = false;
 
@@ -1446,19 +1429,18 @@
 
 				},
 
-				// Clears the model and sets its data to the default data.
-				// Unsets it if it is optional and propagates the new state if asked to.
+				/*
+				  Clears the model and sets its data to the default data.
+				  Unsets it if it is optional and propagates the new state if asked to.
+				*/
 				clear : function (doPropagate) {
 					this._setData(this.getDefaultData());
 					this.setModified(false);
 					if (this.isOptional() && this.isSet()) {
 						this.unset(doPropagate);
 					}
+					this.setListeners();
 				},
-
-				handleBlur : function (ev) {
-					this.stopEditing(false);
-				}
 			}
 		};
 	}());

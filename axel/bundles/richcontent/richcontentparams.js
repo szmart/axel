@@ -14,9 +14,10 @@
  * 
  * ***** END LICENSE BLOCK ***** */
  
- /*
- To mention in the how-to : must include a link to richcontentparams.js and richcontent.css
- */
+
+    /*
+	  A link to this file should be included on the XHTML template to load the parameters.
+	*/
  
     if (! window.axelParams) {
         window.axelParams = {};

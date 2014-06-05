@@ -45,6 +45,7 @@
 		font-size: 9pt;
 		margin: 8pt 3px 0px 3px; 
 		overflow: auto;
+		resize: none;
 	}
 	
 	.edit-button {
@@ -53,6 +54,8 @@
         -moz-border-radius: 5px;
         border-radius: 5px;
 		border: 0;
+		min-width: 200px;
+		min-height: 20px;
 		margin-top: 10px;
 		padding: 2px 4px 2px 4px;
 		font-size: 10pt;
@@ -60,23 +63,6 @@
 		-moz-box-shadow: 2px 2px 1px #888888;
 		-webkit-box-shadow: 2px 2px 1px #888888;
 	}
-	
-	
-	.modal {
-		display: none;
-	    background-color: #DFDFD0;
-	    padding: 30px;
-	    border: 1px solid black;
-        -moz-border-radius: 5px;
-        border-radius: 5px;
-	    float: left;
-	    font-size: 12pt;
-	    z-index: 99999;
-		box-shadow: 2px 2px 1px #888888;
-		-moz-box-shadow: 2px 2px 1px #888888;
-		-webkit-box-shadow: 2px 2px 1px #888888;
-	}
-	
 	
 	.buttons-container {
 		padding:20px; 
@@ -93,3 +79,19 @@
 		-moz-box-shadow: 2px 2px 1px #888888;
 		-webkit-box-shadow: 2px 2px 1px #888888;
 	}
+	
+	.modal {
+		display: none;
+	    background-color: #DFDFD0;
+	    padding: 30px;
+	    border: 1px solid black;
+        -moz-border-radius: 5px;
+        border-radius: 5px;
+	    float: left;
+	    font-size: 12pt;
+	    z-index: 99999;
+		box-shadow: 2px 2px 1px #888888;
+		-moz-box-shadow: 2px 2px 1px #888888;
+		-webkit-box-shadow: 2px 2px 1px #888888;
+	}	
+	
