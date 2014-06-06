@@ -42,46 +42,45 @@
 
     <h1>The <code>"rich content"</code> plugin</h1>
 
-    <p>The <code>"rich content"</code> plugin is a text editing field with stylable content. As it makes its handle <code>contentEditable</code>, it offers a perfect integration with the page to create a WYSIWYG experience. You can use it to edit text that flows around floating elements.</p>
+    <p>The <code>"rich content"</code> plugin is a text editing field with stylable content. As it makes its handle <code>contentEditable</code>, it offers a perfect integration with the page to create a WYSIWYG experience.</p>
 
     <h2>Parameters</h2>
 
     <ul class="parameters">
       <li><var>noedit</var> (<code><b>true</b>|<b>false</b></code>) : set it  to <code><b>true</b></code> to make the field read only (constant).</li>
-      <li><var>class</var> (<code><i>name</i></code>) : set a class name on the handle.</li>
-	  <li><var>lang</var> (<code><i>fragments</i>|<i>html</i></code>|<i>semantic</i>) : set the input/output format (default is <code><i>fragments</i></code>).</li>
+      <li><var>class</var> (<code><i>name</i></code>) : sets a class name on the handle (default is <code>span</code>.</li>
+	  <li><var>lang</var> (<code><i>fragments</i>|<i>html</i></code>|<i>semantic</i>) : sets the input/output format (default is <code><i>Fragments</i></code>).</li>
 	  <li><var>multilines</var> (<code><i>normal|none</i></code>) : allows for line breaks in the editable content.</li>
     </ul>
 
     <h2>Default configuration</h2>
 	
-	
 	<p>The default configuration accepts an input composed of a list of <code>Fragments</code> and <code>Links</code>. <code>Fragments</code> contain a single text node, <code>Links</code> are parents to a <code>LinkRef</code> and a <code>LinkText</code>. The <code>Fragments</code> and <code>LinkTexts</code> can optionally bear a <code>RichStyle</code> attribute.</p>
 
     <div class="demo extract">
-        <p contenteditable="true"><xt:use types="richContent" label="parag" ><Fragment>The Gallic Empire (Latin: </Fragment><Fragment RichStyle="bold">Imperium Galliarum</Fragment><Fragment>) is the modern name for a breakaway part of the Roman Empire that functioned </Fragment><Fragment RichStyle="italics">de facto</Fragment><Fragment> as a separate state from 260 to 274. It originated during the Crisis of the Third Century. It was </Fragment><Link><LinkRef> http://www.libe.fr</LinkRef><LinkText>established</LinkText></Link><Fragment> by Postumus in 260  </Fragment><Fragment RichStyle="italics_underline">in the wake of barbarian</Fragment><Fragment> invasions and instability in Rome, and at its height included the territories of Germania, Gaul, Britannia, and (for a time) Hispania. After Postumus' assassination in 268 it lost much of its territory, but continued under a number of emperors and usurpers. It was retaken by Roman emperor Aurelian after the Battle of Châlons in 274.</Fragment></xt:use><xt:menu-marker/></p>
+        <p contenteditable="true"><xt:use types="richContent" label="parag" ><Fragment>The Gallic Empire (Latin: </Fragment><Fragment RichStyle="bold">Imperium Galliarum</Fragment><Fragment>) is the modern name for a breakaway part of the </Fragment><Link><LinkRef>http://en.wikipedia.org/wiki/Roman_Empire</LinkRef><LinkText>Roman Empire</LinkText></Link><Fragment> that functioned </Fragment><Fragment RichStyle="italics">de facto</Fragment><Fragment> as a separate state from 260 to 274. It originated during the Crisis of the third century. It was established by </Fragment><Link><LinkRef>http://en.wikipedia.org/wiki/Postumus</LinkRef><LinkText>Postumus</LinkText></Link><Fragment> in 260  </Fragment><Fragment RichStyle="italics_underline">in the wake of barbarian</Fragment><Fragment> invasions and instability in Rome, and at its height included the territories of Germania, Gaul, Britannia, and (for a time) Hispania. After Postumus' assassination in 268 it lost much of its territory, but continued under a number of emperors and usurpers. It was retaken by Roman emperor Aurelian after the Battle of Châlons in 274.</Fragment></xt:use><xt:menu-marker/></p>
     </div>
 	
     <h2>With spans</h2>
 
-	<p>The `html' configuration accepts an input composed of a list of HTML <code>spans</code> and <code>a</code> nodes. <code>spans</code> and <code>as</code> contain a single text node. Their style is determined by a CSS <code>class</code> attribute</p>
+	<p>The 'html' configuration accepts an input composed of a list of HTML <code>spans</code> and <code>a</code> nodes. <code>spans</code> and <code>as</code> contain a single text node. Their style is determined by a CSS <code>class</code> attribute</p>
 
     <div class="demo extract">
-        <p><xt:use types="richContent" label="parag" param="lang=html"><span>The Gallic Empire (Latin: </span><span class="bold">Imperium Galliarum</span><span>) is the modern name for a breakaway part of the Roman Empire that functioned </span><span class="italics">de facto</span><span> as a separate state from 260 to 274. It originated during the Crisis of the Third Century. It was </span><a href="http://www.libe.fr">established</a><span> by Postumus in 260  </span><span class="italics underline">in the wake of barbarian</span><span> invasions and instability in Rome, and at its height included the territories of Germania, Gaul, Britannia, and (for a time) Hispania. After Postumus' </span><a href="http://www.lemonde.fr">assassination</a><span> in 268 it lost much of its territory, but continued under a number of emperors and usurpers. It was retaken by Roman emperor Aurelian after the Battle of Châlons in 274.</span></xt:use><xt:menu-marker/></p>
+        <p><xt:use types="richContent" label="parag" param="lang=html"><span>The Gallic Empire (Latin: </span><span class="bold">Imperium Galliarum</span><span>) is the modern name for a breakaway part of the </span><a href="http://en.wikipedia.org/wiki/Roman_Empire">Roman Empire</a><span> that functioned </span><span class="italics">de facto</span><span> as a separate state from 260 to 274. It originated during the Crisis of the third century. It was established by </span><a href="http://en.wikipedia.org/wiki/Postumus">Postumus</a><span> in 260 </span><span class="italics underline">in the wake of barbarian</span><span> invasions and instability in Rome, and at its height included the territories of Germania, Gaul, Britannia, and (for a time) Hispania. After Postumus' assassination in 268 it lost much of its territory, but continued under a number of emperors and usurpers. It was retaken by Roman emperor Aurelian after the Battle of Châlons in 274.</span></xt:use><xt:menu-marker/></p>
     </div>
 	
     <h2>With semantic tags</h2>
 
-	<p>The `semantic' configuration accepts an input composed of a list of custom, user-chosen tags, supposedly representing some categories of meaning. The semantic tags can match CSS classes with the same names, and will be displayed in accordance with the definition of the classes. Non meaningful nodes can be created with the <code>Text</code>, and <code>Link</code> tags. The latter should assume the same structure as the links of the `fragments' configuration, with a `LinkRef' subnode containing the target, and a subnode containing some semantic tag for the texte (or the non-meaningful <code>Text</code> tag).</p>
+	<p>The 'semantic' configuration accepts an input composed of a list of custom, user-chosen tags, supposedly representing some categories of meaning. The semantic tags can match CSS classes with the same names, and will be displayed in accordance with the definition of the classes. Non meaningful nodes can be created with the <code>Text</code>, and <code>Link</code> tags. The latter should assume the same structure as the links of the 'Fragments' configuration, with a 'LinkRef' subnode containing the target, and a subnode containing some semantic tag for the text (or the non-meaningful <code>Text</code> tag).</p>
 
     <div class="demo extract">
-        <p><xt:use types="richContent" label="parag" param="lang=semantic"><Text>The Gallic Empire (Latin: </Text><bold>Imperium Galliarum</bold><Text>) is the modern name for a breakaway part of the Roman Empire that functioned </Text><italics>de facto</italics><Text> as a separate state from 260 to 274. It originated during the Crisis of the Third Century. It was </Text><Link><LinkRef>http://www.libe.fr</LinkRef><LinkText>established</LinkText></Link><Text> by Postumus in 260  </Text><italics_underline>in the wake of barbarian</italics_underline><Text> invasions and instability in Rome, and at its height included the territories of Germania, Gaul, Britannia, and (for a time) Hispania. After Postumus' </Text><Link><LinkRef>http://www.lemonde.fr</LinkRef><bold>assassination</bold></Link><Text> in 268 it lost much of its territory, but continued under a number of emperors and usurpers. It was retaken by Roman emperor Aurelian after the Battle of Châlons in 274.</Text></xt:use><xt:menu-marker/></p>
+        <p><xt:use types="richContent" label="parag" param="lang=semantic"><Text>The Gallic Empire (Latin: </Text><bold>Imperium Galliarum</bold><Text>) is the modern name for a breakaway part of the </Text><Link><LinkRef>http://www.libe.fr</LinkRef><LinkText>Roman Empire</LinkText></Link><Text> that functioned </Text><italics>de facto</italics><Text> as a separate state from 260 to 274. It originated during the Crisis of the third century. It was established by </Text><Link><LinkRef>http://en.wikipedia.org/wiki/Postumus</LinkRef><LinkText>Postumus</LinkText></Link><Text> in 260  </Text><italics_underline>in the wake of barbarian</italics_underline><Text> invasions and instability in Rome, and at its height included the territories of Germania, Gaul, Britannia, and (for a time) Hispania. After Postumus' </Text><bold>assassination</bold><Text> in 268 it lost much of its territory, but continued under a number of emperors and usurpers. It was retaken by Roman emperor Aurelian after the Battle of Châlons in 274.</Text></xt:use><xt:menu-marker/></p>
     </div>
 	
 
     <h2>With multilines</h2>
 	
-	<p>The `multilines' configuration will display the line breaks appearing in the content.</p>
+	<p>The 'multilines' configuration will display the line breaks appearing in the content.</p>
 
     <div class="demo extract">
         <p><xt:use types="richContent" label="parag" param="multilines=normal">

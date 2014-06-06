@@ -1,0 +1,29 @@
+  
+<demo>
+  <parag>
+    <Fragment>The </Fragment>
+    <Fragment RichStyle="bold">Ming dynasty</Fragment>
+    <Fragment>, also </Fragment>
+    <Fragment RichStyle="bold">Empire of the Great Ming</Fragment>
+    <Fragment>, was the ruling dynasty of </Fragment>
+    <Link>
+      <LinkText>China</LinkText>
+      <LinkRef>http://en.wikipedia.org/wiki/China</LinkRef>
+    </Link>
+    <Fragment> for 276 years (1368–1644) following the collapse of the Mongol-led </Fragment>
+    <Link>
+      <LinkText>Yuan dynasty</LinkText>
+      <LinkRef>http://en.wikipedia.org/wiki/Yuan_dynasty</LinkRef>
+    </Link>
+    <Fragment>. The Ming, described by some as "</Fragment>
+    <Fragment RichStyle="italics">one of the greatest eras of orderly government and social stability in human history</Fragment>
+    <Fragment>", was the last dynasty in </Fragment>
+    <Link>
+      <LinkText>China</LinkText>
+      <LinkRef>http://en.wikipedia.org/wiki/China</LinkRef>
+    </Link>
+    <Fragment> ruled by ethnic Han Chinese. Although the primary capital of Beijing fell in 1644 to a rebellion led by Li Zicheng (who established the Shun dynasty, soon replaced by the Manchu-led Qing dynasty), regimes loyal to the Ming throne – collectively called the </Fragment>
+    <Fragment RichStyle="bold">Southern Ming</Fragment>
+    <Fragment> – survived until 1662.</Fragment>
+  </parag>
+</demo>

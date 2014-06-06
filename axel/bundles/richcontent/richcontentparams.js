@@ -16,7 +16,7 @@
  
 
     /*
-	  A link to this file should be included on the XHTML template to load the parameters.
+	  A link to this file should be included on the XHTML template
 	*/
  
     if (! window.axelParams) {

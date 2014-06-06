@@ -4,84 +4,180 @@
 \usepackage{amsfonts}
 \usepackage{amssymb}
 \usepackage{url}
+\usepackage{ulem}
+
 \begin{document}
 
-\title{Title}
-\author{author\\
-   \url{email@email.com}}
+\title{Conception and Implementation of a Rich-Style Structured Text Plugin for the Axel Library\\\bigskip{\large Semester project}\\{\large EPFL -- Spring 2014}}
+\author{Stephane Martin\\
+   \url{stephane.martin@epfl.ch}}
 \date{\today}
  
 \maketitle
 
-The aim of the project was to conceive and implement a rich style editor as an addition to the Axel library. The editor had to provide editable areas embeddable into any HTML5 webpage, giving the user the ability to change the content of the area, to format parts of the content with at least the basic styles offered by most editors, and to paste content copied from some other source. The editor had to ensure cross-browser compatibility inasmuch as was possible\footnote{The ability for some non-trivial Javascript code to work on different browsers is often a thorny issue, due to the lack of complete standardization among the various browsers. The code was mostly developed on Firefox, and tested on Microsoft's Internet Explorer, Safari, and Chrome.}. The plugin should optionally let the user customize its behaviour, allowing for user-defined styles and several input/output formats. 
+The aim of the project was to conceive and implement a rich style editor as an addition to the Axel library. The editor had to provide editable areas embeddable into any HTML5 webpage\footnote{The plugin is intended to work on HTML5-compliant browsers. Its main features (`contentEditable' attribute, draggable elements) would be meaningless otherwise. This is why we have not made a particular effort to test it on less advanced implementations.}, giving the user the ability to modify their content, to format them with at least the basic styles offered by most editors, and to paste content copied from other sources. The editor had to ensure cross-browser compatibility inasmuch as was possible\footnote{The ability for non-trivial Javascript code to work on different browsers is often a thorny issue, due to the lack of complete standardization. The code was mostly developed on Firefox, and tested on Microsoft's Internet Explorer, Safari, and Chrome. The main functions should work on all of them, although the specific effects might differ slightly depending on the browser's implementation.}. An optional extension was to let the user customize the plugin's behaviour, allowing for user-defined styles and several input/output formats. 
 
-% say something about the other editors. http://www.tinymce.com/ Aloha
 
-% Add something for the intro
-
-Axel is a Javascript-based, client-side library allowing to edit XML documents directly on a webpage. It provides a number of plugins to make various elements user-editable (text areas, selects, links, images, videos, etc.). It also allows to load content defined as XML-templates and to save the same content, even after editing, in the same format. The purpose of the richContent plugin is thus to add a new kind of editable object to Axel's collection.
+Axel\footnote{\url{http://media.epfl.ch/software.html}, \url{media.epfl.ch/Templates/}, source code on \url{https://github.com/ssire/axel}.} is a Javascript-based, client-side library allowing to edit XML documents directly on a webpage (more precisely on an XHTML page organized as an XTiger template\footnote{\url{http://www.w3.org/Amaya/Templates/XTiger-spec.html}.}). It provides a number of plugins to make various elements user-editable (text areas, selects, links, images, videos, etc.). It also makes it possible to load content defined as XML documents and to save it  in the same format after editing. The purpose of the rich-content plugin is thus to enrich Axel's collection with a new kind of editable object.
 
 \section{Implementation}
 
-The code is organized around three main files: \texttt{richContent.js} that contains the bulk of the code, \texttt{richcontent.css}, that defines a number of CSS classes (those can be tweaked to change the appearance of the menu, and the functions of the buttons), and \texttt{richcontentparams.js}, that specifies non-default parameters. Note that the latter file is not \emph{stricto sensu} necessary ; it is only a convenience to modify the editor for specific purposes.
+The code is organized around three main files: \texttt{richContent.js} that contains the bulk of the code, \texttt{richcontent.css}, that defines a number of CSS classes (those can be tweaked to change the appearance of the menu and the functions of the buttons), and \texttt{richcontentparams.js}, that specifies non-default parameters. Note that the latter file is not \textit{stricto sensu} necessary ; it is only a convenience to modify the editor for specific purposes\footnote{The repository of the project also includes two template files \texttt{RichContentTest.xhtml}, that can be used to test loading and saving templates on a single field (test XML files are available in \texttt{test/misc} as \texttt{fragment\_test.xml}, \texttt{span\_test.xml}, \texttt{semantic\_test.xml}), and \texttt{RichContentSemantic.xhtml}, that provides an example of user-defined semantic tags (with a corresponding XML file \texttt{test/misc/semantic\_meanings.xml}. But those files are only throw-away test material.}.
 
-The editor relies on the possibility to designate some elements as `contenteditable', a new feature introduced in HTML 5. Furnishing an element (such as a div or a span) with the attribute \texttt{contenteditable=true} will allow a user to type in, delete or paste new content. Whenever the edition process starts, the plugin will thus first set the root of the element (the `handle') as \texttt{contenteditable=true}. The attribute is set to false whenever the the editor is false or another field gets the focus.
+The editor relies on the possibility to designate some elements as `contenteditable', a new feature introduced in HTML5 (\url{http://www.w3.org/TR/html5/}). Furnishing an element (such as a \texttt{<div>} or a \texttt{<span>}) with the attribute \texttt{contenteditable=true} allows a user to directly type in, delete or paste new content. Whenever the edition process starts, the plugin will thus first set the root of the editable area (the `handle') as \texttt{contenteditable=true}. The attribute is set back to false when the editor is closed or another field gets the focus.
 
-The main point of the rich-content plugin is however not so much to let some elements be editable, but to enable rich-style editing, i.e. to be able to impose various formats on (parts of) the content. The default formats we settled on are `bold', `italics', `underlined' and `striked', but other formats can be defined by the user. Although standard HTML already defines some formatting tags, we decided to use exclusively CSS classes, for the sake of simplicity. The use of CSS also allows for a better separation between structure and presentation, and makes the editor less browser-dependent. 
+The main point of the rich-content plugin is however not so much to let some elements be editable, but to enable rich-style editing, i.e. to be able to impose various formats on (parts of) the content. The edition process is carried through thanks to a menu that pops up when the user clicks on the editable content, and thus makes it editable. The menu offers a number of buttons corresponding to the available styles. The default options we settled on are `\textbf{bold}', `\textit{italics}', `\underline{underlined}' and `\sout{striked}', but, as we will see below, other formats can be defined by the user. A `clear' button is also provided to rid the selected text of any style. A textarea and two further buttons let the user add and remove hyperlinks\footnote{Firefox (probably due to a bug) makes textareas partly non-editable when inside a draggable element. To circumvent the problem, we had to introduce two mouseover- and mouseout-event listeners to remove and to set back the draggable attribute when the mouse comes onto the area. This hack might hopefully be removed if later versions of Firefox correct the current behaviour.}.
 
-The editor expects the initial data to follow a strict structure, which will also be imposed on the saved content. Three main structures are possible depending on the encoding of the link nodes and the choice of the tags: HTML-like, fragment-like (the default one) or semantic. The style of the text included in the nodes should also be defined through a CSS class as is usual in HTML. 
+Styles are of course combinable as much as the browser-specific rendering makes it possible: a given piece of text can be made at the same time bold and underlined, striked and italics\footnote{Some browsers however do not display the striked and underline styles together.}. Selecting some text already formatted and formatting it again will however remove the corresponding style from the selection. Hitting the `bold' button after selecting a bit of text in bold will thus clear it of its bold style (but any other style will be conserved).
 
-- In the HTML structure, the root node of the data (``\verb?<xt:use types="richContent" ... >? is parent to a list of nodes, standard nodes (typically spans) and link nodes (typically `a' nodes), each of which contains only a text node. The links bear additionally a target attribute (typically `\verb?href=<value>?'). A class attribute can be used to define the style of any node.
 
-- The fragment-like structure expects the data to be composed of a list of `Fragment' nodes containing a single text node, similar to the HTML structure. The links however should be parents to two nodes, a `LinkText' node that will contain the visible text of the link, and a `LinkRef' node, whose inner text should be the target. The Fragment- and LinkText-nodes can optionally support a `RichStyle' attribute that will be reinterpreted as a CSS class when the plugin will create the corresponding DOM elements. The visible rendering of a RichStyle attribute should hence be defined in some accessible CSS class of the same name.
+Although standard HTML defines some formatting tags (\texttt{<strong>}, \texttt{<i>}, etc.) that could be used as markers of style, we decided to rely exclusively on CSS classes, for the sake of simplicity and regularity\footnote{We can thus compose the HTML content of the handle exclusively with a sequence of \texttt{<span>} and \texttt{<a>} nodes, which turns out to be easier to manipulate.}. The use of CSS also allows for a better separation between structure and presentation, and makes the editor less browser-dependent. 
 
-- The semantic structure works with data made of a list of elements, the tags of which are defined by the user. Each of them will be used by the plugin to define the class attribute of the corresponding DOM elements. Additionally two ``neuter" tags are defined, `Text' for the standard unstyled text bits, and `Link' for the links. The latter should possess two children, a `LinkRef' to define the target and a semantically tagged node to hold the text of the link (or a standard `Text' node, if no semantics is to be imposed on the text).
+The menu is endowed with the \texttt{draggable=true} attribute, also a feature of HTML5, which makes it possible to move it around on the window, at least in standard-compliant browsers. Note that the menu will keep its position even when it is hidden. It should reappear later a the position it occupied when it was last closed.
 
-The default values for the tags and attributes in all three structures can be changed through a \texttt{richcontentparams.js} file. The latter, normally stored in the \texttt{axel/bundles/richcontent/} folder, can override the default parameters applied in creating the editing menu, and in extracting and dumping the data. The relevant definitions are expected to appear, in JSON-like format, as a `richContent' object inside an `axelParams' object attached to the window: 
+% mention the menu as pop-up window
+
+The editor expects the initial data to assume a strict structure, which will also be imposed on the saved content. Three main patterns are possible, depending on the encoding of the link nodes and the choice of the tags: HTML-like, Fragment-like (the default one) or semantic.  
+
+\begin{itemize}
+\item In the HTML structure, the root node of the data (corresponding to ``\verb?<xt:use types="richContent" ... >? in the templates) is parent to a list of nodes of two kinds: standard nodes (typically \texttt{<span>}) and link nodes (typically \texttt{<a>} nodes), each of which contains only a text node. The links bear additionally a target attribute (typically `\verb?href=<value>?'). A `class' attribute is used to specify the style of any node.
+
+\item In the Fragment-type structure, the data are composed of a list of \texttt{<Fragment>} nodes containing a single text node, similar to the HTML structure. The links however are parents to two nodes, a \texttt{<LinkText>} node that will contain the visible text of the link, and a \texttt{<LinkRef>} node, whose inner text should be the target. The Fragment- and LinkText-nodes can optionally support a `RichStyle' attribute that will be reinterpreted as a CSS class when the plugin creates the corresponding DOM elements. The visible rendering of a RichStyle attribute should hence be defined in some accessible CSS class of the same name.
+
+\item The semantic structure works with data made of a list of elements, the tags of which are defined by the user. Each of them will be used by the plugin to name the class attribute of the corresponding DOM element\footnote{Only tags with a name matching an existing CSS class will be retained in the process.}. Additionally two ``neuter" tags are defined, \texttt{<Text>} for the standard unstyled text bits, and \texttt{<Link>} for the links. The latter should possess two children, a \texttt{<LinkRef>} to define the target, and a semantically tagged node to hold the text of the link (or a standard \texttt{<Text>} node, if no semantics is to be imposed on the text).
+
+\end{itemize}
+
+The default values for the tags and attributes in all three structures can be redefined in the \texttt{richcontentparams.js} file. The latter, normally stored in the \texttt{axel/bundles/richcontent/} folder, will override the default parameters applied while creating the editing menu, and while extracting and dumping the data. The relevant definitions are expected to appear, in JSON-like format, as a `richContent' object inside an `axelParams' object attached to the window (Fig. \ref{params}). 
+
+\begin{figure}[h!]
+  \centering
 
 \begin{verbatim}
-    window.axelParams['richContent'] = {
+    window.axelParams[`richContent'] = {
         formatsAndCSS: <array of button names and styles>, 
         dataStructure: <structures of data>
     }
 \end{verbatim}
 
-Optionally, the same effect could be achieved by defining a \verb?<script>...</script>? area directly on the page.
+  \caption{Rich-content parameters inside \texttt{richcontentparams.js}.}
+  \label{params}
+\end{figure}
 
-In the default setting, the menu displays buttons for the default styles (bold, italic, underline, striked) as well as a link making/unmaking area. A new set of buttons can be defined, with other names and other effects, in the \texttt{formatsAndCSS} array of \texttt{richcontentparams.js}. Each element should be an object with two fields, a `name', that will be displayed on the button, and a `style' that designates the CSS class that will be applied on the selection when hitting the button. Note that the appearance of the buttons and the menu is defined in \texttt{axel/bundles/richcontent.css} and can be changed at will.
 
-The `dataStructure' field can override the names of the fields in some or all of the three structures allowed for the data (if some structure is not mentioned, the default setting will be used). This is especially useful to customize the tags of the data dumped in the saving process. 
+In the default setting, the menu displays buttons for the default styles (bold, italic, underline, striked) as well as a link making/unmaking area. A new set of buttons can be defined, with other names and other effects, in the \texttt{formatsAndCSS} array of \texttt{richcontentparams.js} (Fig. \ref{formatsAndCSS}). Each item in the array should be an object with two fields, a `name', that will be displayed on the button, and a `style' that designates the CSS class that will be applied on the selection when hitting the button. Note that the appearance of the buttons and the menu is defined in \texttt{axel/bundles/richcontent.css} and can be tweaked by redefining the appropriate classes.
+
+\begin{figure}[h!]
+  \centering
+
+\begin{verbatim}
+    formatsAndCSS : [
+        {name : `Bold', style : `bold'},
+        {name : `Italics', style : `italics'},
+        {name : `Underline', style : `underline'},
+        {name : `Strike', style : `line-through'}
+    ]
+\end{verbatim}
+
+
+  \caption{Possible values for \texttt{formatsAndCSS}.}
+  \label{formatsAndCSS}
+\end{figure}
+
+The `dataStructure' field serves to override the names of the fields in some or all of the three structures allowed for the data (if some structure is not mentioned, the default setting will be used) (Fig. \ref{dataStructure}). This is especially useful to customize the tags of the data dumped in the saving process.
+
+\begin{figure}[h!]
+  \centering
+
+
+\begin{verbatim}
+  dataStructure : {
+    html : {
+      link : {tag : 'a', ref : 'href', style : 'class'},
+      standard : {tag : 'span', style : 'class'}
+    },
+    fragments : {
+      link : {tag : 'Link', 
+              ref : {tag : 'LinkRef'}, 
+              text : {tag : 'LinkText', style : 'RichStyle'}},
+      standard : {tag : 'Fragment', style : 'RichStyle'}},
+    semantic : {
+      link : {tag : 'Link', 
+              ref : {tag : 'LinkRef'}, 
+              text : {standard : 'LinkText'}},
+      standard : {tag : 'Text'}}
+    }
+\end{verbatim} 
+
+
+  \caption{Possible values for \texttt{dataStructure}.}
+  \label{dataStructure}
+\end{figure}
 
 % link pop-up
 
-Any editable field defined on the page will become the current editable instance, responding to the menu, whenever the user clicks on its span elements. Clicking on the links however will trigger a pop-up window to let the user choose to either open the target URL, or start the edition process. If several editable instances are present on the page, only the instance currently focused will be registered with the menu. Clicking on another one will just reregister the menu on the latter.
+Any editable field defined on the page will become the current editable instance, responding to the menu, whenever the user clicks on its \texttt{<span>} elements. Clicking on the links however will trigger a pop-up window\footnote{We reuse the device in \texttt{popup.js}.} to let the user choose to either open the target URL, or start the edition process. If several editable instances are present on the page, only the instance currently focused on will be registered with the menu. Clicking on another instance will just reregister the menu on the latter.
 
 % allowed styles
 
-The editor is configured to permit only CSS classes defined in \texttt{formatsAndCSS} to occur inside the handle, either in the default version hard-coded inside \texttt{richContent.js} or in the user-defined version, if any.
+The editor is configured to permit only CSS classes defined in \texttt{formatsAndCSS} to occur inside the handle, either in the default version hard-coded inside \texttt{richContent.js}, or in the user-defined version.
  
 % _ vs spaces
 
-The RichStyle attributes supported by the Fragment items and the tags defining the nodes in the semantic structure will become the class attributes born by the `span' and `a' children of the handle. As is customary for CSS classes, when several of them are present, they will appear as a sequence of strings separated by spaces. The corresponding semantic tags and RichStyle attributes will however display them as separated by `\_'. Care should thus be taken to avoid underscores when choosing class identifiers. 
+The RichStyle attributes supported by the \texttt{<Fragment>} items and the tags defining the nodes in the semantic structure will become the class attributes born by the corresponding \texttt{<span>} and \texttt{<a>} children of the handle. As is customary for CSS classes, when several of them are present, they will appear as a sequence of strings separated by spaces. The corresponding semantic tags and RichStyle attributes will however handle them as strings separated by `\_'. Care should thus be taken to avoid underscores when choosing class identifiers. 
 
 % multilines
 
-The default version of the editor creates the handle as a span. Since only spans and a nodes will appear as its children, whatever newline character present in the pieces of text they contain will be ignore. It is possible to force the editor to display line breaks and spaces either with the parameter \verb?<xt:use ... handle="pre">?', or with \verb?<xt:use ... param="multilines=normal">?'. In the first case, any newline present in the data will appear as such, but the user will not be allowed to add any. In the second case, the user will be able to add carriage returns by hitting Shift+Enter.  
+The default version of the editor creates the handle as a \texttt{<span>}. Since only \texttt{<span>}- and \texttt{<a>}- nodes will appear as its children, whatever newline character present in their text content will be ignored. It is possible to force the editor to display line breaks and spaces either by requiring the editor to create a \texttt{<pre>} node for the handle, \verb?<xt:use ... handle="pre">?', or by specifying the ``multilines'' parameter as \verb?<xt:use ... param="multilines? \verb?=normal">?\footnote{Note that in general we have taken care to make the parameters case-insensitive, so that the code should respond similarly to \texttt{"multilines=normal"} and \texttt{"multilines=Normal"}, etc.}. In the first case, any line break already present in the data will appear as such, but the user will not be allowed to add further ones. In the second case, the user will be able to introduce carriage returns by hitting Shift+Enter\footnote{This is done by changing the handle's type to \texttt{<pre>} instead of the default \texttt{<span>}. The keyboard is made to respond to Shift+Enter through a call to the function \texttt{this.keyboard.enableRC()}. Note that this function is set and cancelled each time the instance changes, since several instances with different behaviours could have to coexist on the same page.}.  
 
-\section{Technical notes}
+\section{Implementation notes}
 
-The main editing operations are achieved by the function \texttt{makeLink(linkArea, link)}, \texttt{clearRange()}, \texttt{enrich(style)} and \texttt{interceptPaste(node, event)}, that rely on the auxiliary functions \texttt{recreateTree(root, mainTag, allTagged, inherit, style, link, clear)} and \texttt{cleanTree(target, current)}. 
+The main editing operations are achieved by the functions
 
-The first three follow a similar structure. They first obtain a range object covering the currently selected piece inside the editable field; they extracts its content, and injects it into a new node, created on the spot. The node is then inserted onto the page instead of the selection. This has the effect of disturbing the relatively flat structure of the handle (the handle is a 3-level tree with span- and a-children nodes, each with a text node as child). The \texttt{recreateTree()} function is then called to reshuffle the handle, while applying any transformation necessary to achieve the desired effect. This involves adding or removing classes, creating elements with different tag names, adding the 'href' attributes where needed. Finally the \texttt{cleanTree()} function is called to suppress redundant or empty nodes created in the process.
+\begin{itemize}
+\item \texttt{makeLink(linkArea, link)}
+\item \texttt{clearRange()}
+\item \texttt{enrich(style)}
+\item \texttt{interceptPaste(node, event)}
+\end{itemize}
 
-\texttt{InterceptPaste()} works similarly except that it only deals with simple unformatted text. Avoiding the paste of HTML is an intentional decision, made as much for the sake of simplicity, and because it would be difficult to translate consistently text extracted from random pages into the format allowed by the editor. One advantage of the decision is to make it unnecessary to call \texttt{recreateTree()} after the pasted text is injected, as we only need to make sure the parent to the newly inserted node (that contains the pasted text) only contains a text node. This is done by call to the \texttt{innerText(node)} function, that extracts the text content from its argument, discarding any formatting at the same time. 
 
-\texttt{interceptPaste()} has to cancel the default effect of the paste operation. Unfortunately, browsers tend to be inconsistent here, with some responding to \verb?event.preventDefault()? (Firefox, for instance) while others (at least some versions of IE) will work properly only with the \verb?event.returnValue = false;? instruction. Recovering the content of the clipboard also requires slightly different constructs (\texttt{window.clipboardData.getData(``Text")}, \texttt{event.clipboardData.getData(``Text")}). The resulting output should be a cleaned, tag-free, version of the copied content; unfortunately, some occasional --- and hardly predictable --- corner cases seem to be handled improperly by some browsers.
+\noindent that rely on the auxiliary functions
 
-The content of the data is extracted thanks to the three functions \texttt{extractHTMLContentXT()}, \texttt{extractFragmentContentXT()}, \texttt{extractSemanticContentXT()}, one for each of the possible structures. Despite their differences, they all work similarly to create a DOM tree suitable to fill the editable area. Note that we had to overload \texttt{xtdom.extractDefaultContentXT()} to let the editor work with formatted text, instead of the simple text released by the original function. The reverse operation --- creating an XML tree from the data before saving it --- is achieved by the three corresponding functions \texttt{logToHTML()}, \texttt{logToSemantic()}, \texttt{logToFragments()}.
+\begin{itemize}
+\item \texttt{recreateTree(root, allTagged, inherit, style, link, clear)}
+\item \texttt{cleanTree(target, current)}
+\end{itemize}
+
+
+The first three follow a similar structure. They first obtain a range object\footnote{http://www.w3.org/TR/2000/REC-DOM-Level-2-Traversal-Range-20001113/ranges.html} covering the current selection; they extract its content, and inject it into a new node, created on the spot. The node is then inserted onto the page instead of the selection. This has the effect of disturbing the relatively flat structure of the handle (the handle is a 3-level tree with \texttt{<span>}- and \texttt{<a>}-children nodes, each with a text node as only child). The \texttt{recreateTree()} function is then called to reshape the handle, while applying any transformation necessary to achieve the desired effect. This involves adding or removing classes, creating elements with different tag names, adding the `href' attributes where needed. Finally, the \texttt{cleanTree()} function is called to suppress redundant or empty nodes created in the process\footnote{The extraction of the range object and its reinjection create a number of empty nodes, while the edition and reedition of the same bits of text easily create sequences of nodes with identical formats. It is thus useful to simplify the content by removing the first and merging the second.}.
+
+\texttt{interceptPaste()} works similarly except that it only deals with simple unformatted text. Avoiding the paste of HTML-formatted text is an intentional decision, made as much for the sake of simplicity, and because it would be difficult to translate consistently text extracted from random pages into the formats allowed by the editor. One advantage of the decision is to make it unnecessary to call \texttt{recreateTree()} after the pasted text is injected, as we only need to make sure the parent to the newly inserted node (that contains the pasted text) contains a single text node. This is done by a call to the \texttt{innerText(node)} function, that extracts the text content from its argument, discarding any formatting at the same time. 
+
+\texttt{interceptPaste()} has to cancel the default effect of the paste operation. Unfortunately, browsers tend to be inconsistent here, with some responding to \verb?event.preventDefault()? (Firefox, for instance) while others (at least some versions of IE) will work properly only with the instruction \verb?event.returnValue = false?. Recovering the content of the clipboard also requires different constructs (\texttt{window.clipboardData.getData()} for Microsoft IE, and \texttt{event.clipboardData.getData()} for other browsers)\footnote{The resulting output should be a cleaned, tag-free version of the copied content; unfortunately, no matter how much care is taken to account for every situation, some residual --- and hardly predictable --- corner cases seem to always be handled improperly by some implementations.}. 
+
+
+The content of the data is extracted thanks to the three functions
+
+\begin{itemize}
+\item \texttt{extractHTMLContentXT()}
+\item \texttt{extractFragmentContentXT()}
+\item \texttt{extractSemanticContentXT()}
+\end{itemize}
+
+\noindent one for each of the possible structures. Despite their differences, they all work similarly to create a DOM tree suitable to fill the editable area. Note that we had to overload \texttt{xtdom.extractDefaultContentXT()} to let the editor work with formatted text, instead of the simple text released by the original function. The reverse operation --- creating an XML tree from the data before saving it --- is achieved by the three corresponding functions \texttt{logToHTML()}, \texttt{logToSemantic()}, \texttt{logToFragments()}, which simply traverse the handle's children and produce corresponding outputs.
+
 
 
 \section{Conclusion}
+
+A number of improvements could of course be imagined to develop the plugin further. The editing operations currently implemented are applied on selected pieces of content. It could be interesting to add content-wide operations, such as right/left/center-justification. This would probably imply some change in the data model, or working directly on the handle. 
+
+Being able to select different fonts, either for the whole content or for parts of it would make for an interesting addition. This presents a number of difficulties however, since the availability of fonts would depend on the client-side configuration.
+
+A further extension could be to let the user embed non-text objects inside the editor's content, such as pictures, or video material. Here again, this would imply changing the structure of the data significantly.  
+
+If the structure of accepted data is to be tweaked to accommodate other kinds of editing, it would probably become worthwhile making that structure itself configurable by the user. In the current state of the code, \texttt{richcontentparams.js} allows to introduce new tags for the three structures, but the structures themselves are fixed. A more sophisticated version could make it possible to defined new structures for the data under the guise of deeper and more complicated trees.
 
 
 \end{document}

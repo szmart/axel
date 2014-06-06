@@ -82,6 +82,7 @@
 	
 	.modal {
 		display: none;
+		white-space: nowrap;
 	    background-color: #DFDFD0;
 	    padding: 30px;
 	    border: 1px solid black;
@@ -93,5 +94,6 @@
 		box-shadow: 2px 2px 1px #888888;
 		-moz-box-shadow: 2px 2px 1px #888888;
 		-webkit-box-shadow: 2px 2px 1px #888888;
-	}	
+	}
+
 	
