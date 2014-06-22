@@ -40,6 +40,14 @@
 		  The regex pattern used to define a valid URL.
 		*/
 		var urlPattern = new RegExp(/[-a-zA-Z0-9@:%_\+.~#?&//=]{2,}\.[a-z]{2,}\b(\/[-a-zA-Z0-9@:%_\+.~#?&//=]*)?/gi);
+		
+		/*
+		  Creates a default content to fill the editable area in case no other
+		  content is provided.
+		*/
+		var _defaultText = 'Click to edit';
+		var _defaultContent = document.createElement('span');
+		_defaultContent.textContent = _defaultText;
 
 		/* 
 		  The default format names as displayed on the buttons and their corresponding CSS classes.
@@ -144,6 +152,13 @@
 			
 			if (axelParamsRichContent.dataStructure && axelParamsRichContent.dataStructure.semantic) {
 				dataStructure.semantic = axelParamsRichContent.dataStructure.semantic; 
+			}
+		}
+		
+		function _checkEmptyContent(instance) {
+		    if (/^\s*$/.test(innerText(instance._handle))) {
+				instance._setData(instance.getDefaultData());
+				instance.setListeners();
 			}
 		}
 
@@ -949,8 +964,8 @@
 					var data = extractFragmentContentXT(aDefaultData);
 				}
 				
-				if (! data) {
-					this._content = '<span>Click to edit</span>'; 
+				if (/^\s*$/.test(innerText(data))) {
+					this._content = _defaultContent; 
 				} else {
 					this._content = data.cloneNode(true);
 				}
@@ -1046,13 +1061,31 @@
 					while (this._handle.firstChild) {
 						this._handle.removeChild(this._handle.firstChild);
 					}
-					while (aData.firstChild) {
-						this._handle.appendChild(aData.firstChild);
+					
+					var dataCopy = aData.cloneNode(true);
+					
+					while (dataCopy.firstChild) {
+						this._handle.appendChild(dataCopy.firstChild);
 					}
 
 					this.model = aData;
 
 				},
+				
+				/*
+				  To be called after the editor has been cloned, to perform
+				  the initialization not performed by the cloning itself
+				  (most notably adding the event listeners).
+				*/
+			    onCloned : function (clone, original) {
+					for (var i = 0; i < original.childNodes.length; i++) {
+						clone.appendChild(original.childNodes[i].cloneNode(true));
+				    }
+				    if (this.getParam('noedit') !== 'true') {
+					    this.setListeners();
+				    }
+					this._content = this._handle.cloneNode(true);
+			    },
 
 				// AXEL keyboard API (called from Keyboard manager instance)
 				isEditing : function () {
@@ -1080,8 +1113,9 @@
 					for (var i = 0; i < this._handle.children.length; i++) {
 						var child = this._handle.children[i];
 						child.addEventListener('paste', function(ev) {_this.interceptPaste(ev, child); return false;}, true);
-						xtdom.addEventListener(child, 'click', function(ev) {  _this.clickedFrag(ev); return false;}, true);
+						xtdom.addEventListener(child, 'click', function(ev) {_this.clickedFrag(ev); return false;}, true);
 					}
+					xtdom.addEventListener(this._handle, 'blur', function() {_checkEmptyContent(_this);});
 				},
 
 				/*
@@ -1397,7 +1431,6 @@
 							this.__open__editor();
 						}
 					}
-
 				},
 
 				/*
@@ -1450,10 +1483,7 @@
 
 					setEditable(this, 'false')
 
-					if (/^\s*$/.test(innerText(this._handle))) {
-						this._setData(this.getDefaultData());
-						this.setListeners();
-					}
+					_checkEmptyContent(this);
 
 				},
 

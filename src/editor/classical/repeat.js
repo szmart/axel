@@ -325,7 +325,7 @@ xtiger.editor.Repeat.prototype = {
     this.shallowFinishCloning (clone, node, dict);
     for (var i = 0; i < node.childNodes.length; i++) {
       this.shallowCloneIter (clone, node.childNodes[i], dict);
-    }                                             
+    }     	
     return clone; // the clone is not saved in a document (dangling)
   },
                               
@@ -463,6 +463,9 @@ xtiger.editor.Repeat.prototype = {
       var clone = xtdom.cloneNode (this.curDoc, node, true);    
       parent.appendChild (clone); // parent and clone MUST BE in the same document
       this.deepFinishCloning (clone, node, modelDict, masterRepeater, accu); 
+	  if (clone.xttPrimitiveEditor.onCloned) {
+	    clone.xttPrimitiveEditor.onCloned(clone, node);
+	  }
       return;
     } 
     var clone = xtdom.cloneNode (this.curDoc, node, false);   
